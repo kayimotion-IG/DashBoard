@@ -66,18 +66,22 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6 pb-12 animate-in fade-in">
-      {/* Personalized Welcome Banner - Logo now floats with transparency */}
+      {/* Personalized Welcome Banner - Logo floats with native transparency */}
       <div className="relative overflow-hidden bg-slate-900 rounded-[32px] p-10 shadow-2xl border border-slate-800">
          <div className="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 bg-[#fbaf0f] rounded-full mix-blend-multiply filter blur-3xl opacity-5"></div>
          <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-96 h-96 bg-blue-600 rounded-full mix-blend-multiply filter blur-3xl opacity-5"></div>
          
          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
             <div className="flex items-center gap-8">
-               <div className="p-0 bg-transparent rounded-none border-none">
+               <div className="bg-transparent">
                   {settings.logoUrl ? (
-                    <img src={settings.logoUrl} alt="Org Logo" className="h-24 w-auto object-contain drop-shadow-2xl" />
+                    <img 
+                      src={settings.logoUrl} 
+                      alt="Org Logo" 
+                      className="h-24 w-auto object-contain brightness-110 drop-shadow-[0_0_20px_rgba(251,175,15,0.2)]" 
+                    />
                   ) : (
-                    <div className="w-20 h-20 bg-[#fbaf0f] rounded-xl flex items-center justify-center font-black text-3xl text-slate-900">K</div>
+                    <div className="w-20 h-20 bg-[#fbaf0f] rounded-xl flex items-center justify-center font-black text-3xl text-slate-900 shadow-xl">K</div>
                   )}
                </div>
                <div>

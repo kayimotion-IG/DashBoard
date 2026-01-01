@@ -145,7 +145,7 @@ const SidebarItem: React.FC<{item: any, depth?: number}> = ({ item, depth = 0 })
       onClick={() => hasChildren && setIsOpen(!isOpen)}
     >
       <div className="flex items-center gap-3">
-        {item.icon && <span className={isActive ? 'text-slate-900' : 'text-slate-500'}>{item.icon}</span>}
+        {item.icon && <span className={isActive ? 'text-slate-900' : 'text-slate-50'}>{item.icon}</span>}
         <span className="font-bold">{item.label}</span>
       </div>
       {hasChildren && (
@@ -229,10 +229,14 @@ export default function App() {
     <AuthContext.Provider value={{ user, loading, login, logout, can, settings, refreshSettings }}>
       <div className="flex h-screen bg-slate-50 overflow-hidden">
         <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 transition-transform duration-300 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 border-r border-slate-800 shrink-0 shadow-2xl`}>
-          <div className="flex items-center justify-center h-28 px-6 border-b border-slate-800/50">
+          <div className="flex items-center justify-center h-28 px-4 border-b border-slate-800/50">
             <Link to="/" className="w-full flex justify-center py-4">
               {settings.logoUrl ? (
-                <img src={settings.logoUrl} alt="KlenCare Logo" className="h-20 w-auto object-contain max-w-[200px]" />
+                <img 
+                  src={settings.logoUrl} 
+                  alt="KlenCare Logo" 
+                  className="h-16 w-auto object-contain max-w-[200px] brightness-110 contrast-110" 
+                />
               ) : (
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 bg-[#fbaf0f] rounded-lg flex items-center justify-center font-black text-slate-900 shadow-lg text-lg">K</div>
