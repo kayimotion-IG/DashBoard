@@ -243,8 +243,8 @@ class ItemService {
     const finishedItem = this.getItemById(assy.finishedItemId);
     if (!finishedItem) throw new Error("Finished item not found");
 
-    const allowNegative = this.getSettings().allowNegativeStock;
-    if (!allowNegative) {
+    // Correcting corrupted line to check if negative stock is allowed from settings
+    if (!this.getSettings().allowNegativeStock) {
       assy.components.forEach(comp => {
         const available = this.calculateStock(comp.itemId, warehouseId);
         if (available < comp.quantity * quantity) {
@@ -282,14 +282,14 @@ class ItemService {
 
   getSettings() { 
     const defaults = {
-      companyName: "KlenCare CRM",
-      companyAddress: "Dubai, United Arab Emirates",
-      companyPhone: "+971 4 000 0000",
-      companyEmail: "info@klencare.com",
+      companyName: "KLENCARE Fzc",
+      companyAddress: "9, Rolex Tower, Dubai, UAE",
+      companyPhone: "050-315-7462",
+      companyEmail: "support@klencare.net",
       currency: "AED",
       vatNumber: "",
       allowNegativeStock: false,
-      pdfFooter: "Thank you for your business. KlenCare CRM",
+      pdfFooter: "Thank you for your business. KLENCARE Fzc",
       logoUrl: "https://res.cloudinary.com/dkro3vzx5/image/upload/Gemini_Generated_Image_o6s2wbo6s2wbo6s2.png"
     };
     return JSON.parse(localStorage.getItem('klencare_settings') || JSON.stringify(defaults)); 

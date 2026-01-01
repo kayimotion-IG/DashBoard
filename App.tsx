@@ -1,12 +1,11 @@
-
-import React, { useState, useEffect, createContext, useContext } from 'react';
+import React, { useState, useEffect, createContext, useContext, useRef } from 'react';
 import { Routes, Route, Navigate, Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, Package, ShoppingCart, Truck, Users, 
   BarChart3, FileText, LogOut, Search, Bell, 
   ChevronDown, ChevronRight, Plus, Menu, X, 
   Boxes, ShieldCheck, Settings as SettingsIcon, Database, Activity,
-  FileSpreadsheet
+  FileSpreadsheet, Receipt, ArrowRight, MousePointer2
 } from 'lucide-react';
 
 import Dashboard from './views/Dashboard';
@@ -53,6 +52,8 @@ import { User, Role, Permission, AppSettings } from './types';
 import { hasPermission } from './config/permissions';
 import { auditService } from './services/audit.service';
 import { itemService } from './services/item.service';
+import { salesService } from './services/sales.service';
+import { purchaseService } from './services/purchase.service';
 
 interface AuthContextType {
   user: User | null;
@@ -176,15 +177,32 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [isSidebarOpen, setSidebarOpen] = useState(true);
   const [settings, setSettings] = useState<AppSettings>(itemService.getSettings());
+  const [globalSearch, setGlobalSearch] = useState('');
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+  
   const location = useLocation();
   const navigate = useNavigate();
 
   useEffect(() => {
     const savedSession = localStorage.getItem('klencare_session');
     if (savedSession) {
-      setUser(JSON.parse(savedSession));
+      try {
+        setUser(JSON.parse(savedSession));
+      } catch (e) {
+        console.error("Session corrupt, clearing...");
+        localStorage.removeItem('klencare_session');
+      }
     }
     setLoading(false);
+
+    const handleClickOutside = (e: MouseEvent) => {
+       if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+          setShowSearchResults(false);
+       }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const refreshSettings = () => {
@@ -214,6 +232,21 @@ export default function App() {
     if (!user) return false;
     return hasPermission(user.role, permission);
   };
+
+  // GLOBAL REAL-TIME SEARCH LOGIC
+  const getSearchResults = () => {
+     if (!globalSearch || globalSearch.length < 2) return null;
+     const s = globalSearch.toLowerCase();
+     
+     const items = itemService.getItems({}, 1, 1000).data.filter(i => i.name.toLowerCase().includes(s) || i.sku.toLowerCase().includes(s)).slice(0, 3);
+     const customers = salesService.getCustomers().filter(c => c.name.toLowerCase().includes(s) || c.companyName.toLowerCase().includes(s)).slice(0, 3);
+     const invoices = salesService.getInvoices().filter(i => i.invoiceNumber.toLowerCase().includes(s)).slice(0, 3);
+     const orders = salesService.getSalesOrders().filter(o => o.orderNumber.toLowerCase().includes(s)).slice(0, 3);
+
+     return { items, customers, invoices, orders };
+  };
+
+  const searchResults = getSearchResults();
 
   if (loading) return <div className="h-screen flex items-center justify-center bg-slate-900 text-[#fbaf0f] font-bold tracking-tighter text-2xl">KlenCare Pro</div>;
 
@@ -271,9 +304,72 @@ export default function App() {
           <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 shrink-0 custom-shadow z-40">
             <div className="flex items-center gap-4">
               <button className="lg:hidden text-slate-500" onClick={() => setSidebarOpen(true)}><Menu size={24} /></button>
-              <div className="relative group">
+              <div className="relative group" ref={searchRef}>
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#fbaf0f]" size={18} />
-                <input type="text" placeholder="Search records..." className="bg-slate-100 border-transparent focus:bg-white focus:ring-2 focus:ring-amber-100 focus:border-[#fbaf0f] rounded-full py-2 pl-10 pr-4 w-64 lg:w-96 outline-none text-sm transition-all" />
+                <input 
+                  type="text" 
+                  value={globalSearch}
+                  onChange={(e) => { setGlobalSearch(e.target.value); setShowSearchResults(true); }}
+                  onFocus={() => setShowSearchResults(true)}
+                  placeholder="Omnisearch: items, invoices, customers..." 
+                  className="bg-slate-100 border-transparent focus:bg-white focus:ring-2 focus:ring-amber-100 focus:border-[#fbaf0f] rounded-full py-2 pl-10 pr-4 w-64 lg:w-[450px] outline-none text-sm transition-all" 
+                />
+                
+                {/* Real-time Global Results Overlay */}
+                {showSearchResults && searchResults && (
+                   <div className="absolute top-full left-0 mt-3 w-full bg-white rounded-[24px] shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-slate-100 p-2 overflow-hidden z-[100] animate-in slide-in-from-top-2">
+                      <div className="max-h-[500px] overflow-y-auto p-4 space-y-6">
+                         {searchResults.items.length > 0 && (
+                            <div className="space-y-2">
+                               <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 px-2"><Package size={12}/> Items Found</h5>
+                               {searchResults.items.map(i => (
+                                  <div key={i.id} onClick={() => { navigate(`/items/${i.id}`); setShowSearchResults(false); setGlobalSearch(''); }} className="flex items-center justify-between p-2.5 hover:bg-amber-50 rounded-xl cursor-pointer group transition-colors">
+                                     <div>
+                                        <p className="text-sm font-bold text-slate-900 group-hover:text-brand">{i.name}</p>
+                                        <p className="text-[10px] text-slate-400 font-mono">{i.sku}</p>
+                                     </div>
+                                     <ArrowRight size={14} className="text-slate-300 opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all"/>
+                                  </div>
+                               ))}
+                            </div>
+                         )}
+                         {searchResults.customers.length > 0 && (
+                            <div className="space-y-2">
+                               <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 px-2"><Users size={12}/> Clients</h5>
+                               {searchResults.customers.map(c => (
+                                  <div key={c.id} onClick={() => { navigate(`/sales/customers`); setShowSearchResults(false); setGlobalSearch(''); }} className="flex items-center justify-between p-2.5 hover:bg-blue-50 rounded-xl cursor-pointer group transition-colors">
+                                     <div>
+                                        <p className="text-sm font-bold text-slate-900 group-hover:text-blue-600">{c.name}</p>
+                                        <p className="text-[10px] text-slate-400">{c.companyName}</p>
+                                     </div>
+                                     <ArrowRight size={14} className="text-slate-300 opacity-0 group-hover:opacity-100"/>
+                                  </div>
+                               ))}
+                            </div>
+                         )}
+                         {searchResults.invoices.length > 0 && (
+                            <div className="space-y-2">
+                               <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 px-2"><Receipt size={12}/> Financials</h5>
+                               {searchResults.invoices.map(inv => (
+                                  <div key={inv.id} onClick={() => { navigate(`/sales/invoices`); setShowSearchResults(false); setGlobalSearch(''); }} className="flex items-center justify-between p-2.5 hover:bg-emerald-50 rounded-xl cursor-pointer group transition-colors">
+                                     <div>
+                                        <p className="text-sm font-bold text-slate-900 group-hover:text-emerald-600">{inv.invoiceNumber}</p>
+                                        <p className="text-[10px] text-slate-400">Total: AED {inv.total}</p>
+                                     </div>
+                                     <ArrowRight size={14} className="text-slate-300 opacity-0 group-hover:opacity-100"/>
+                                  </div>
+                               ))}
+                            </div>
+                         )}
+                         {!searchResults.items.length && !searchResults.customers.length && !searchResults.invoices.length && (
+                            <div className="py-10 text-center text-slate-400">
+                               <Search size={32} className="mx-auto mb-2 opacity-20"/>
+                               <p className="text-xs font-bold uppercase tracking-widest">No matching records</p>
+                            </div>
+                         )}
+                      </div>
+                   </div>
+                )}
               </div>
             </div>
 

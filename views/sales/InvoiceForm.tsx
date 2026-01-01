@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, Save, Receipt, Package, Calendar, User, Info, FileText } from 'lucide-react';
+import { ArrowLeft, Save, Receipt, Package, Calendar, User, Info, FileText, ShieldCheck } from 'lucide-react';
 import { salesService } from '../../services/sales.service';
 import { useAuth } from '../../App';
 
@@ -25,7 +25,8 @@ export default function InvoiceForm() {
     total: 0,
     subTotal: 0,
     taxTotal: 0,
-    notes: ''
+    notes: '',
+    includeStamp: true // Default to true for professional billing
   });
 
   const [lines, setLines] = useState<any[]>([]);
@@ -56,13 +57,11 @@ export default function InvoiceForm() {
       return;
     }
     
-    // Create the invoice
     salesService.createInvoice({
       ...formData,
       lines 
     }, user);
 
-    // Ensure bi-directional status update
     if (sourceSOId) {
       salesService.updateSOStatus(sourceSOId, 'Invoiced', user);
     }
@@ -141,6 +140,28 @@ export default function InvoiceForm() {
               className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none text-sm" 
             />
           </div>
+        </div>
+
+        {/* STAMP OPTION INSERT AREA */}
+        <div className="bg-slate-900 p-6 rounded-3xl shadow-xl flex items-center justify-between group">
+           <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-blue-600/20 text-blue-400 rounded-2xl flex items-center justify-center border border-blue-500/30 group-hover:scale-110 transition-transform">
+                <ShieldCheck size={24} />
+              </div>
+              <div>
+                <p className="text-white font-black text-sm uppercase tracking-widest">Official Company Stamp</p>
+                <p className="text-slate-400 text-xs font-medium">Embed KLENCARE FZC digital seal on the generated Tax Invoice.</p>
+              </div>
+           </div>
+           <label className="relative inline-flex items-center cursor-pointer">
+              <input 
+                type="checkbox" 
+                checked={formData.includeStamp} 
+                onChange={e => setFormData({...formData, includeStamp: e.target.checked})}
+                className="sr-only peer" 
+              />
+              <div className="w-14 h-7 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-blue-600"></div>
+           </label>
         </div>
 
         {sourceSOId && (

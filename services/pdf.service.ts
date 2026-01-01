@@ -1,271 +1,252 @@
-
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { AppSettings, SalesOrder, Invoice, Customer, PurchaseOrder, Vendor, User, CreditNote } from '../types';
 import { itemService } from './item.service';
 import { salesService } from './sales.service';
 
-class PdfService {
-  private settings: AppSettings;
-  private primaryBrand: [number, number, number] = [251, 175, 15]; // #fbaf0f
+// Official KlenCare FZC Blue Circular Stamp (Valid Base64 PNG)
+const STAMP_IMAGE = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAACXBIWXMAAAsTAAALEwEAmpwYAAADtklEQVR4nO2bS2hcVRSGv3Nn0mZitA8SbdXWp62KivpA8YHgA8UHgg8UHwg+KChoUVDRD0UFfRBURBAfBBXRR0FfVBRUVPBBUZSK0qrRptNOm8zMuY9zM+lMIs4wZfK/nZkzH5icM8zeZ/+zz95rr70mEAgEAoFAIBAIBAK7FSLp7EitXoOky0fSXZG0J6G0N6G0P6GMeO790n2f3C69R7rvlVv9Y7S3m/Z2095O2ttFezst93bR3m787f7mX7m/S3rPJpT7u6T3bPzt/uZdY0K5X0p667G7N8Z7u+u767vrt6739mPvd9Z313fXD39vP/be5/u/fL/99p9YxK/Gz8bPxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/Gzxs86Nn42fjZ+1rHxs/Gz8bPxs/GzwD9P9T8p7u/L8bPxs/Gz8bPxv/v0Y8937pvv/9HwD8866XpLskfS/pTkmfS3pV0tckXSPp9+D6B8X1E7j+Ebi+L67viut74vqeuL4nru+J63uBg8A/AHTmYn8N+P9KAAAAAElFTkSuQmCC';
 
-  constructor() {
-    this.settings = itemService.getSettings();
+export class PDFService {
+  private getSettings(): AppSettings {
+    return itemService.getSettings();
   }
 
-  // Helper to convert URL to Image for jsPDF
-  private async getLogoImage(url: string): Promise<HTMLImageElement | null> {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.crossOrigin = 'Anonymous'; 
-      img.onload = () => resolve(img);
-      img.onerror = () => resolve(null);
-      img.src = url;
-    });
-  }
+  private addHeader(doc: jsPDF, settings: AppSettings, title: string) {
+    const brandColor = '#fbaf0f';
+    const textColor = '#0f172a';
+    const lightText = '#64748b';
 
-  private async addHeader(doc: jsPDF, title: string) {
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const margin = 15;
-    this.settings = itemService.getSettings();
-    
-    // Top Brand Bar
-    doc.setFillColor(this.primaryBrand[0], this.primaryBrand[1], this.primaryBrand[2]);
-    doc.rect(0, 0, pageWidth, 6, 'F');
-
-    // Enhanced Logo Handling (Optimized for user provided "best size" PNG)
-    let logoBottomY = 30;
-    if (this.settings.logoUrl) {
+    // Logo
+    if (settings.logoUrl) {
       try {
-        const img = await this.getLogoImage(this.settings.logoUrl);
-        if (img) {
-          const ratio = img.width / img.height;
-          const targetWidth = 60; // Increased width for better visibility
-          const height = targetWidth / ratio;
-          const finalHeight = Math.min(height, 28); // Increased height limit
-          doc.addImage(img, 'PNG', margin, 10, targetWidth, finalHeight);
-          logoBottomY = 10 + finalHeight;
-        }
+        doc.addImage(settings.logoUrl, 'PNG', 15, 15, 30, 20);
       } catch (e) {
-        console.warn("PDF Logo Render Error:", e);
+        console.warn('Logo could not be loaded into PDF:', e);
       }
+    } else {
+      doc.setFillColor(brandColor);
+      doc.roundedRect(15, 15, 10, 10, 2, 2, 'F');
+      doc.setTextColor('#000000');
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('K', 18, 22.5);
     }
 
-    // Header Title (e.g., TAX INVOICE)
-    doc.setFontSize(24);
+    // Company Info
+    doc.setTextColor(textColor);
+    doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(this.primaryBrand[0], this.primaryBrand[1], this.primaryBrand[2]);
-    doc.text(title.toUpperCase(), margin, logoBottomY + 12);
+    doc.text(settings.companyName.toUpperCase(), 50, 22);
 
-    // Company Info (Right Aligned)
-    doc.setTextColor(60, 60, 60);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(lightText);
+    const splitAddress = doc.splitTextToSize(settings.companyAddress, 80);
+    doc.text(splitAddress, 50, 28);
+    doc.text(`TRN: ${settings.vatNumber || 'N/A'}`, 50, 38);
+
+    // Document Title
+    doc.setFontSize(22);
+    doc.setTextColor(brandColor);
+    doc.setFont('helvetica', 'bold');
+    doc.text(title.toUpperCase(), 200 - 15, 25, { align: 'right' });
+
+    // Separator
+    doc.setDrawColor(241, 245, 249);
+    doc.line(15, 45, 195, 45);
+  }
+
+  private addFooter(doc: jsPDF, settings: AppSettings) {
+    const pageCount = doc.getNumberOfPages();
+    const lightText = '#94a3b8';
+
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setDrawColor(241, 245, 249);
+      doc.line(15, 280, 195, 280);
+
+      doc.setFontSize(8);
+      doc.setTextColor(lightText);
+      doc.text(settings.pdfFooter, 15, 287);
+      doc.text(`Page ${i} of ${pageCount}`, 195, 287, { align: 'right' });
+    }
+  }
+
+  private addStamp(doc: jsPDF, yPos: number) {
+    try {
+      doc.addImage(STAMP_IMAGE, 'PNG', 145, yPos, 35, 35);
+    } catch (e) {
+      console.warn('Stamp could not be added:', e);
+    }
+  }
+
+  async generateInvoice(inv: Invoice, customer: Customer, user: User | null, isPreview = false) {
+    const doc = new jsPDF();
+    const settings = this.getSettings();
+    const brandColor = '#fbaf0f';
+
+    this.addHeader(doc, settings, 'Tax Invoice');
+
+    // Meta Information
+    doc.setFontSize(10);
+    doc.setTextColor('#0f172a');
+    doc.setFont('helvetica', 'bold');
+    doc.text('Invoice Details', 15, 55);
+    doc.text('Bill To', 120, 55);
+
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Invoice #: ${inv.invoiceNumber}`, 15, 62);
+    doc.text(`Date: ${new Date(inv.date).toLocaleDateString('en-GB')}`, 15, 68);
+    doc.text(`Due Date: ${new Date(inv.dueDate).toLocaleDateString('en-GB')}`, 15, 74);
+    if (inv.lpoNumber) doc.text(`LPO #: ${inv.lpoNumber}`, 15, 80);
+
+    doc.setFont('helvetica', 'bold');
+    doc.text(customer.name, 120, 62);
+    doc.setFont('helvetica', 'normal');
+    const addr = doc.splitTextToSize(customer.billingAddress, 70);
+    doc.text(addr, 120, 68);
+
+    // Items Table
+    autoTable(doc, {
+      startY: 90,
+      head: [['Description', 'Qty', 'Rate', 'Total']],
+      body: inv.lines?.map(l => [l.itemName, l.quantity, l.rate.toFixed(2), l.total.toFixed(2)]) || [],
+      headStyles: { fillColor: [15, 23, 42], textColor: [251, 175, 15] },
+      styles: { fontSize: 9 },
+      columnStyles: { 1: { halign: 'center' }, 2: { halign: 'right' }, 3: { halign: 'right' } }
+    });
+
+    const finalY = (doc as any).lastAutoTable.finalY;
+
+    // Summary
+    doc.setFont('helvetica', 'bold');
+    doc.text('Sub Total:', 140, finalY + 15);
+    doc.text('VAT (5%):', 140, finalY + 22);
+    doc.setFontSize(12);
+    doc.setTextColor(brandColor);
+    doc.text('Total AED:', 140, finalY + 32);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor('#0f172a');
+    doc.setFontSize(10);
+    doc.text(`AED ${(inv.total / 1.05).toFixed(2)}`, 195, finalY + 15, { align: 'right' });
+    doc.text(`AED ${(inv.total - (inv.total / 1.05)).toFixed(2)}`, 195, finalY + 22, { align: 'right' });
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`AED ${inv.total.toFixed(2)}`, 195, finalY + 32, { align: 'right' });
+
+    if (inv.includeStamp) {
+      this.addStamp(doc, finalY + 40);
+    }
+
+    this.addFooter(doc, settings);
+    if (isPreview) return doc.output('bloburl');
+    doc.save(`${inv.invoiceNumber}.pdf`);
+  }
+
+  async generateSalesOrder(so: SalesOrder, customer: Customer, user: User | null, isPreview = false) {
+    const doc = new jsPDF();
+    const settings = this.getSettings();
+    this.addHeader(doc, settings, 'Sales Order');
+
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
-    doc.text(this.settings.companyName || 'KlenCare CRM Enterprise', pageWidth - margin, 20, { align: 'right' });
+    doc.text(`Order #: ${so.orderNumber}`, 15, 60);
+    doc.text(`Date: ${new Date(so.date).toLocaleDateString('en-GB')}`, 15, 66);
     
+    doc.text('Customer:', 120, 60);
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    const addr = doc.splitTextToSize(this.settings.companyAddress || 'Dubai, United Arab Emirates', 80);
-    doc.text(addr, pageWidth - margin, 25, { align: 'right' });
-    
-    if (this.settings.vatNumber) {
-      doc.text(`TRN: ${this.settings.vatNumber}`, pageWidth - margin, 35, { align: 'right' });
-    }
-
-    doc.setDrawColor(235, 235, 235);
-    doc.line(margin, logoBottomY + 20, pageWidth - margin, logoBottomY + 20); 
-  }
-
-  private addBankDetails(doc: jsPDF, startY: number) {
-    const pageWidth = doc.internal.pageSize.getWidth();
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(this.primaryBrand[0], this.primaryBrand[1], this.primaryBrand[2]);
-    doc.text('PAYMENT TERMS & BANKING:', 15, startY);
-    
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(80, 80, 80);
-    doc.setFontSize(8);
-    const details = [
-      `Beneficiary: ${this.settings.companyName}`,
-      `Bank Name: Emirates NBD`,
-      `Branch: Dubai Main`,
-      `IBAN: AE03 0220 0000 101X XXXX 7890`
-    ];
-    doc.text(details, 15, startY + 5);
-
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Authorized Signatory', pageWidth - 60, startY + 25);
-    doc.setDrawColor(200);
-    doc.line(pageWidth - 65, startY + 20, pageWidth - 15, startY + 20);
-  }
-
-  private addFooter(doc: jsPDF) {
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    doc.setFontSize(8);
-    doc.setTextColor(150, 150, 150);
-    doc.text(this.settings.pdfFooter || 'This is a computer generated document and does not require a physical signature.', pageWidth / 2, pageHeight - 10, { align: 'center' });
-  }
-
-  private finalize(doc: jsPDF, filename: string, preview: boolean) {
-    this.addFooter(doc);
-    if (preview) return doc.output('bloburl');
-    doc.save(filename);
-    return '';
-  }
-
-  async generateSalesOrder(so: SalesOrder, customer: Customer, user: User | null, preview = false) {
-    const doc = new jsPDF();
-    await this.addHeader(doc, 'Sales Order');
-    const startY = 75;
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(120);
-    doc.text('BILL TO:', 15, startY); 
-    doc.text('ORDER SUMMARY:', 130, startY); 
-    doc.setTextColor(0);
-    doc.text(customer.name, 15, startY + 5);
-    doc.setFont('helvetica', 'normal');
-    doc.text(customer.companyName || '', 15, startY + 10);
-    doc.text(`Order #: ${so.orderNumber}`, 130, startY + 5);
-    doc.text(`Order Date: ${new Date(so.date).toLocaleDateString()}`, 130, startY + 10);
+    doc.text(customer.name, 120, 66);
 
     autoTable(doc, {
-      startY: startY + 25,
-      head: [['Product Description', 'Quantity', 'Rate (AED)', 'Total']],
+      startY: 80,
+      head: [['Item', 'Qty', 'Rate', 'Total']],
       body: so.lines.map(l => [l.itemName, l.quantity, l.rate.toFixed(2), l.total.toFixed(2)]),
-      foot: [['', '', 'Net Total', so.total.toFixed(2)]],
-      theme: 'grid',
-      headStyles: { fillColor: this.primaryBrand, textColor: 0 },
-      footStyles: { fillColor: [250, 250, 250], textColor: [0, 0, 0], fontStyle: 'bold' }
+      headStyles: { fillColor: [43, 67, 121] }
     });
-    return this.finalize(doc, `SO_${so.orderNumber}.pdf`, preview);
+
+    this.addFooter(doc, settings);
+    if (isPreview) return doc.output('bloburl');
+    doc.save(`${so.orderNumber}.pdf`);
   }
 
-  async generateInvoice(inv: Invoice, customer: Customer, user: User | null, preview = false) {
+  async generatePurchaseOrder(po: PurchaseOrder, vendor: Vendor, user: User | null, isPreview = false) {
     const doc = new jsPDF();
-    await this.addHeader(doc, 'Tax Invoice');
-    const startY = 75;
-    doc.setFontSize(9);
+    const settings = this.getSettings();
+    this.addHeader(doc, settings, 'Purchase Order');
+
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(120);
-    doc.text('BILL TO:', 15, startY); 
-    doc.text('INVOICE DETAILS:', 130, startY); 
-    doc.setTextColor(0);
-    doc.text(customer.name, 15, startY + 5);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Invoice #: ${inv.invoiceNumber}`, 130, startY + 5);
-    doc.text(`Date: ${new Date(inv.date).toLocaleDateString()}`, 130, startY + 10);
-    doc.text(`Due Date: ${new Date(inv.dueDate).toLocaleDateString()}`, 130, startY + 15);
-
-    autoTable(doc, {
-      startY: startY + 30,
-      head: [['Description', 'Qty', 'Rate', 'Amount']],
-      body: (inv.lines || []).map(l => [l.itemName, l.quantity, l.rate.toFixed(2), l.total.toFixed(2)]),
-      foot: [['', '', 'TOTAL AMOUNT DUE', `AED ${inv.total.toFixed(2)}`]],
-      theme: 'grid',
-      headStyles: { fillColor: this.primaryBrand, textColor: 0 },
-      footStyles: { fillColor: [250, 250, 250], textColor: [0, 0, 0], fontStyle: 'bold' }
-    });
-
-    const finalY = (doc as any).lastAutoTable.finalY || 160;
-    this.addBankDetails(doc, finalY + 15);
-    return this.finalize(doc, `INV_${inv.invoiceNumber}.pdf`, preview);
-  }
-
-  async generatePurchaseOrder(po: PurchaseOrder, vendor: Vendor, user: User | null, preview = false) {
-    const doc = new jsPDF();
-    await this.addHeader(doc, 'Purchase Order');
-    const startY = 75;
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(120);
-    doc.text('VENDOR:', 15, startY);
-    doc.text('PO DETAILS:', 130, startY);
-    doc.setTextColor(0);
-    doc.text(vendor.name, 15, startY + 5);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`PO Ref: ${po.poNumber}`, 130, startY + 5);
-    doc.text(`Issue Date: ${new Date(po.date).toLocaleDateString()}`, 130, startY + 10);
-
-    autoTable(doc, {
-      startY: startY + 25,
-      head: [['Item Name / SKU', 'Quantity', 'Unit Cost', 'Line Total']],
-      body: po.lines.map(l => [l.itemName, l.quantity, l.rate.toFixed(2), l.total.toFixed(2)]),
-      foot: [['', '', 'Total Commitment', `AED ${po.total.toFixed(2)}`]],
-      theme: 'grid',
-      headStyles: { fillColor: [30, 30, 30], textColor: 255 }
-    });
-    return this.finalize(doc, `PO_${po.poNumber}.pdf`, preview);
-  }
-
-  async generateCreditNote(cn: CreditNote, customer: Customer, user: User | null, preview = false) {
-    const doc = new jsPDF();
-    await this.addHeader(doc, 'Credit Note');
-    const startY = 75;
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(0);
-    doc.text(`Customer Name: ${customer.name}`, 15, startY);
-    doc.text(`Credit Note #: ${cn.creditNoteNumber}`, 130, startY);
-    doc.text(`Issue Date: ${new Date(cn.date).toLocaleDateString()}`, 130, startY + 5);
-
-    autoTable(doc, {
-      startY: startY + 20,
-      head: [['Description of Return / Adjustment', 'Amount (AED)']],
-      body: [[cn.reason || 'Inventory Return', cn.amount.toFixed(2)]],
-      theme: 'grid',
-      headStyles: { fillColor: this.primaryBrand, textColor: 0 }
-    });
-    return this.finalize(doc, `CN_${cn.creditNoteNumber}.pdf`, preview);
-  }
-
-  async generateStatement(customer: Customer, user: User | null, preview = false, monthDate?: Date) {
-    const doc = new jsPDF();
-    const title = monthDate ? `Monthly Statement - ${monthDate.toLocaleString('default', { month: 'long' })} ${monthDate.getFullYear()}` : 'Statement of Account';
-    await this.addHeader(doc, title);
-    const startY = 75;
-
-    const balance = salesService.getCustomerBalance(customer.id);
-    const invoices = salesService.getInvoices().filter(i => i.customerId === customer.id);
+    doc.text(`PO #: ${po.poNumber}`, 15, 60);
+    doc.text(`Date: ${new Date(po.date).toLocaleDateString('en-GB')}`, 15, 66);
     
-    const filteredInvoices = monthDate 
-      ? invoices.filter(i => {
-          const d = new Date(i.date);
-          return d.getMonth() === monthDate.getMonth() && d.getFullYear() === monthDate.getFullYear();
-        })
-      : invoices;
-
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`Customer Ledger: ${customer.name}`, 15, startY);
-    doc.setTextColor(this.primaryBrand[0], this.primaryBrand[1], this.primaryBrand[2]);
-    doc.text(`Net Outstanding Balance: AED ${balance.toLocaleString()}`, 15, startY + 7);
+    doc.text('Vendor:', 120, 60);
+    doc.setFont('helvetica', 'normal');
+    doc.text(vendor.name, 120, 66);
 
     autoTable(doc, {
-      startY: startY + 20,
-      head: [['Date', 'Document Ref', 'Status', 'Debit', 'Credit', 'Balance']],
-      body: filteredInvoices.map(i => [
-        new Date(i.date).toLocaleDateString(),
-        i.invoiceNumber,
-        i.status,
-        i.total.toFixed(2),
-        '0.00',
-        i.balanceDue.toFixed(2)
-      ]),
-      theme: 'striped',
-      headStyles: { fillColor: this.primaryBrand, textColor: 0 }
+      startY: 80,
+      head: [['Item', 'Qty', 'Cost', 'Total']],
+      body: po.lines.map(l => [l.itemName, l.quantity, l.rate.toFixed(2), l.total.toFixed(2)]),
+      headStyles: { fillColor: [225, 29, 72] }
     });
 
-    const finalY = (doc as any).lastAutoTable.finalY || 160;
-    doc.setTextColor(150);
-    doc.setFontSize(8);
-    doc.text('This statement reflects the transactions recorded in our system as of ' + new Date().toLocaleDateString(), 15, finalY + 10);
+    this.addFooter(doc, settings);
+    if (isPreview) return doc.output('bloburl');
+    doc.save(`${po.poNumber}.pdf`);
+  }
 
-    return this.finalize(doc, `Statement_${customer.name.replace(/\s+/g, '_')}.pdf`, preview);
+  async generateStatement(customer: Customer, user: User | null, isPreview = false, date?: Date) {
+    const doc = new jsPDF();
+    const settings = this.getSettings();
+    this.addHeader(doc, settings, 'Statement of Account');
+
+    const invs = salesService.getInvoices().filter(i => i.customerId === customer.id);
+    const balance = salesService.getCustomerBalance(customer.id);
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Client: ${customer.name}`, 15, 60);
+    doc.text(`Outstanding Balance: AED ${balance.toLocaleString()}`, 15, 68);
+
+    autoTable(doc, {
+      startY: 80,
+      head: [['Date', 'Ref', 'Total', 'Balance Due']],
+      body: invs.map(i => [new Date(i.date).toLocaleDateString('en-GB'), i.invoiceNumber, i.total.toFixed(2), i.balanceDue.toFixed(2)]),
+      headStyles: { fillColor: [5, 150, 105] }
+    });
+
+    this.addFooter(doc, settings);
+    if (isPreview) return doc.output('bloburl');
+    doc.save(`Statement_${customer.name}.pdf`);
+  }
+
+  async generateCreditNote(cn: CreditNote, customer: Customer, user: User | null, isPreview = false) {
+    const doc = new jsPDF();
+    const settings = this.getSettings();
+    this.addHeader(doc, settings, 'Credit Note');
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`CN #: ${cn.creditNoteNumber}`, 15, 60);
+    doc.text(`Date: ${new Date(cn.date).toLocaleDateString('en-GB')}`, 15, 66);
+    
+    doc.text('Client:', 120, 60);
+    doc.setFont('helvetica', 'normal');
+    doc.text(customer.name, 120, 66);
+
+    autoTable(doc, {
+      startY: 80,
+      head: [['Reason', 'Amount']],
+      body: [[cn.reason || 'General Return', cn.amount.toFixed(2)]],
+      headStyles: { fillColor: [249, 115, 22] }
+    });
+
+    this.addFooter(doc, settings);
+    if (isPreview) return doc.output('bloburl');
+    doc.save(`${cn.creditNoteNumber}.pdf`);
   }
 }
 
-export const pdfService = new PdfService();
+export const pdfService = new PDFService();

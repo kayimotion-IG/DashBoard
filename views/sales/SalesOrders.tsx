@@ -1,9 +1,9 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   ShoppingCart, Search, Filter, Plus, 
   Calendar, ArrowRight, CheckCircle2, Package, Truck, Receipt, Check,
-  Link as LinkIcon
+  Link as LinkIcon, X
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { salesService } from '../../services/sales.service';
@@ -30,24 +30,30 @@ export default function SalesOrders() {
   const navigate = useNavigate();
   const { user, can } = useAuth();
   const [search, setSearch] = useState('');
-  const [refresh, setRefresh] = useState(0);
   
-  const orders = salesService.getSalesOrders().reverse();
+  const orders = salesService.getSalesOrders();
   const allInvoices = salesService.getInvoices();
 
   const handleQuickConfirm = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     if (confirm('Authorize and Confirm this Sales Order?')) {
       salesService.updateSOStatus(id, 'Confirmed', user);
-      setRefresh(prev => prev + 1);
     }
   };
 
-  const filteredOrders = orders.filter(so => {
-    const customer = salesService.getCustomerById(so.customerId);
-    return so.orderNumber.toLowerCase().includes(search.toLowerCase()) || 
-           customer?.name.toLowerCase().includes(search.toLowerCase());
-  });
+  // REAL-TIME SEARCH: Optimized via useMemo
+  const filteredOrders = useMemo(() => {
+    const sorted = [...orders].reverse();
+    if (!search) return sorted;
+    
+    const s = search.toLowerCase();
+    return sorted.filter(so => {
+      const customer = salesService.getCustomerById(so.customerId);
+      return so.orderNumber.toLowerCase().includes(s) || 
+             customer?.name.toLowerCase().includes(s) ||
+             customer?.companyName?.toLowerCase().includes(s);
+    });
+  }, [search, orders]);
 
   return (
     <div className="space-y-6">
@@ -65,35 +71,38 @@ export default function SalesOrders() {
         </button>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-          <div className="relative w-96">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+      <div className="bg-white rounded-[32px] border border-slate-200 shadow-sm overflow-hidden">
+        <div className="p-6 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-4">
+          <div className="relative flex-1 max-w-lg group">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" size={20} />
             <input 
               type="text" 
-              placeholder="Search by SO number or customer..." 
+              placeholder="Search by SO #, client, or company..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 pr-4 py-2 border border-slate-200 rounded-xl w-full outline-none text-sm !bg-white !text-slate-900 focus:ring-2 focus:ring-blue-100"
+              className="pl-12 pr-10 py-3.5 border border-slate-200 rounded-[20px] w-full outline-none text-sm bg-white !text-slate-900 focus:ring-4 focus:ring-blue-50 transition-all font-medium shadow-sm"
             />
+            {search && (
+              <button onClick={() => setSearch('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500">
+                <X size={16} />
+              </button>
+            )}
           </div>
-          <div className="flex gap-2">
-            <button className="flex items-center gap-2 px-3 py-1.5 text-slate-600 border border-slate-200 rounded-lg text-xs font-bold bg-white hover:bg-slate-50">
-              <Filter size={14} /> Filter Status
-            </button>
-          </div>
+          <button className="flex items-center gap-2 px-6 py-3 text-slate-600 border border-slate-200 rounded-2xl text-xs font-black uppercase tracking-widest bg-white hover:bg-slate-50 shadow-sm transition-all">
+            <Filter size={16} /> Filter Status
+          </button>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left">
-            <thead className="bg-white text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-100">
+            <thead className="bg-white text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] border-b border-slate-50">
               <tr>
-                <th className="px-6 py-4">Order Details</th>
-                <th className="px-6 py-4">Customer</th>
-                <th className="px-6 py-4 text-center">Invoice Ref</th>
-                <th className="px-6 py-4 text-right">Total Amount</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Action</th>
+                <th className="px-8 py-5">Order Details</th>
+                <th className="px-6 py-5">Customer</th>
+                <th className="px-6 py-5 text-center">Invoice Ref</th>
+                <th className="px-6 py-5 text-right">Total Amount</th>
+                <th className="px-6 py-5">Status</th>
+                <th className="px-8 py-5 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -107,50 +116,51 @@ export default function SalesOrders() {
                     onClick={() => navigate(`/sales/orders/${so.id}`)}
                     className="hover:bg-slate-50/50 transition-colors group cursor-pointer"
                   >
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-500 transition-colors">
-                          <ShoppingCart size={20} />
+                    <td className="px-8 py-6">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-[18px] flex items-center justify-center font-black text-xs shadow-sm group-hover:scale-105 transition-transform">
+                          SO
                         </div>
                         <div>
                           <p className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors">{so.orderNumber}</p>
-                          <p className="text-[10px] text-slate-400 font-mono">{new Date(so.date).toLocaleDateString()}</p>
+                          <p className="text-[10px] text-slate-400 font-mono tracking-tighter uppercase mt-0.5">{new Date(so.date).toLocaleDateString()}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-6">
                       <p className="text-xs font-bold text-slate-700">{customer?.name}</p>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{customer?.companyName}</p>
                     </td>
-                    <td className="px-6 py-4 text-center">
+                    <td className="px-6 py-6 text-center">
                       {linkedInvoice ? (
-                        <span className="text-[10px] font-black text-emerald-600 uppercase flex items-center justify-center gap-1">
+                        <span className="text-[10px] font-black text-emerald-600 uppercase flex items-center justify-center gap-1 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100">
                           <Receipt size={12} /> {linkedInvoice.invoiceNumber}
                         </span>
                       ) : (
                         <span className="text-[10px] text-slate-300 font-bold uppercase italic">Pending</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-6 text-right">
                       <p className="text-sm font-black text-slate-900">AED {so.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-6">
                       <StatusBadge status={so.status} />
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-8 py-6 text-right">
                       <div className="flex items-center justify-end gap-2">
                         {so.status === 'Draft' && can('sales.approve') && (
                           <button 
                             onClick={(e) => handleQuickConfirm(e, so.id)}
-                            className="p-2 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all"
+                            className="p-3 text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all"
                             title="Quick Confirm"
                           >
-                            <Check size={18} />
+                            <Check size={20} />
                           </button>
                         )}
                         <button 
-                          className="p-2 text-slate-400 hover:text-blue-600 transition-all"
+                          className="p-3 text-slate-400 group-hover:text-blue-600 group-hover:bg-white rounded-xl shadow-none group-hover:shadow-md transition-all"
                         >
-                          <ArrowRight size={18} />
+                          <ArrowRight size={20} />
                         </button>
                       </div>
                     </td>
@@ -158,10 +168,10 @@ export default function SalesOrders() {
                 );
               }) : (
                 <tr>
-                  <td colSpan={6} className="px-6 py-20 text-center">
-                    <div className="flex flex-col items-center gap-2 text-slate-400">
-                      <ShoppingCart size={40} className="opacity-20" />
-                      <p className="text-sm italic">No sales orders found.</p>
+                  <td colSpan={6} className="px-8 py-24 text-center">
+                    <div className="flex flex-col items-center gap-4 text-slate-300">
+                      <ShoppingCart size={64} className="opacity-10" />
+                      <p className="text-sm font-medium italic">No sales orders found for "{search}"</p>
                     </div>
                   </td>
                 </tr>

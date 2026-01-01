@@ -262,6 +262,7 @@ export interface Invoice {
   balanceDue: number;
   status: 'Sent' | 'Partially Paid' | 'Paid' | 'Voided';
   lines?: SalesOrderLine[];
+  includeStamp?: boolean; // Persist stamp preference
 }
 
 export interface CreditNote {
