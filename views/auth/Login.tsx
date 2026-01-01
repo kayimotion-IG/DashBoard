@@ -39,7 +39,7 @@ export default function Login({ onLogin }: LoginProps) {
             <img 
               src={settings.logoUrl} 
               alt="KlenCare Logo" 
-              className="h-32 w-auto object-contain brightness-110 drop-shadow-[0_0_25px_rgba(251,175,15,0.3)]" 
+              className="h-32 w-auto object-contain brightness-110 drop-shadow-[0_15px_25px_rgba(0,0,0,0.5)]" 
             />
           ) : (
             <div className="w-20 h-20 bg-[#fbaf0f] rounded-[28px] flex items-center justify-center font-black text-4xl text-slate-900 shadow-2xl shadow-amber-500/20">K</div>

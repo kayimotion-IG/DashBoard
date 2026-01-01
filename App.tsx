@@ -230,12 +230,12 @@ export default function App() {
       <div className="flex h-screen bg-slate-50 overflow-hidden">
         <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 transition-transform duration-300 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 border-r border-slate-800 shrink-0 shadow-2xl`}>
           <div className="flex items-center justify-center h-28 px-4 border-b border-slate-800/50">
-            <Link to="/" className="w-full flex justify-center py-4">
+            <Link to="/" className="w-full flex justify-center py-4 bg-transparent">
               {settings.logoUrl ? (
                 <img 
                   src={settings.logoUrl} 
                   alt="KlenCare Logo" 
-                  className="h-16 w-auto object-contain max-w-[200px] brightness-110 contrast-110" 
+                  className="h-16 w-auto object-contain max-w-[200px] brightness-110 contrast-110 drop-shadow-[0_5px_10px_rgba(0,0,0,0.4)]" 
                 />
               ) : (
                 <div className="flex items-center gap-3">

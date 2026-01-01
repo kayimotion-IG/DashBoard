@@ -73,12 +73,12 @@ const Dashboard = () => {
          
          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
             <div className="flex items-center gap-8">
-               <div className="bg-transparent">
+               <div className="bg-transparent flex items-center justify-center">
                   {settings.logoUrl ? (
                     <img 
                       src={settings.logoUrl} 
                       alt="Org Logo" 
-                      className="h-24 w-auto object-contain brightness-110 drop-shadow-[0_0_20px_rgba(251,175,15,0.2)]" 
+                      className="h-24 w-auto object-contain brightness-110 drop-shadow-[0_10px_15px_rgba(0,0,0,0.3)]" 
                     />
                   ) : (
                     <div className="w-20 h-20 bg-[#fbaf0f] rounded-xl flex items-center justify-center font-black text-3xl text-slate-900 shadow-xl">K</div>
