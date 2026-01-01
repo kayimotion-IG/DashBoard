@@ -74,18 +74,18 @@ export default function CreditNoteForm() {
             required 
             value={formData.amount} 
             onChange={e => setFormData({...formData, amount: Number(e.target.value)})} 
-            className="w-full px-4 py-4 border rounded-xl text-xl font-black text-rose-600 focus:ring-4 focus:ring-rose-50 outline-none transition-all" 
+            className="w-full px-4 py-4 border rounded-xl text-xl font-black text-rose-600 focus:ring-4 focus:ring-amber-50 outline-none transition-all" 
           />
         </div>
 
-        <div className="p-4 bg-orange-50 border border-orange-100 rounded-2xl flex items-start gap-3">
-          <Info size={18} className="text-orange-600 shrink-0 mt-0.5" />
-          <p className="text-[10px] text-orange-700 leading-relaxed font-bold uppercase">
+        <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl flex items-start gap-3">
+          <Info size={18} className="text-[#fbaf0f] shrink-0 mt-0.5" />
+          <p className="text-[10px] text-[#e59b00] leading-relaxed font-bold uppercase">
             Credit notes decrease the customer's total outstanding balance. This will be reflected in statements immediately.
           </p>
         </div>
 
-        <button type="submit" className="w-full py-4 bg-[#f97316] text-white rounded-xl font-black uppercase text-xs tracking-widest shadow-2xl hover:bg-orange-700 transition-all active:scale-95">
+        <button type="submit" className="w-full py-4 bg-[#fbaf0f] text-slate-900 rounded-xl font-black uppercase text-xs tracking-widest shadow-2xl hover:bg-[#e59b00] transition-all active:scale-95">
           Finalize Credit Issue
         </button>
       </form>

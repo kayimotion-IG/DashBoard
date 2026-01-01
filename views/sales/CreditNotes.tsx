@@ -39,7 +39,7 @@ export default function CreditNotes() {
         </div>
         <button 
           onClick={() => navigate('/sales/credit-notes/new')}
-          className="flex items-center gap-2 px-6 py-2.5 bg-[#f97316] text-white rounded-xl hover:bg-orange-700 font-bold text-sm shadow-xl transition-all"
+          className="flex items-center gap-2 px-6 py-2.5 bg-[#fbaf0f] text-slate-900 rounded-xl hover:bg-[#e59b00] font-bold text-sm shadow-xl transition-all"
         >
           <Plus size={18} />
           New Credit Note
@@ -82,7 +82,7 @@ export default function CreditNotes() {
                   <tr key={cn.id} className="hover:bg-slate-50/50 transition-colors group cursor-pointer">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-orange-50 text-orange-600 rounded-lg flex items-center justify-center font-bold text-xs">CN</div>
+                        <div className="w-10 h-10 bg-orange-50 text-[#fbaf0f] rounded-lg flex items-center justify-center font-bold text-xs">CN</div>
                         <div>
                           <p className="text-sm font-bold text-slate-900">{cn.creditNoteNumber}</p>
                           <p className="text-[10px] text-slate-500 uppercase font-black">{new Date(cn.date).toLocaleDateString()}</p>
@@ -99,7 +99,7 @@ export default function CreditNotes() {
                       <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button 
                           onClick={(e) => handleDownload(e, cn)}
-                          className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-all"
+                          className="p-2 text-slate-400 hover:text-[#fbaf0f] hover:bg-orange-50 rounded-lg transition-all"
                         >
                           <FileDown size={18} />
                         </button>

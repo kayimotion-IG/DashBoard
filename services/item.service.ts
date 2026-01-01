@@ -74,7 +74,6 @@ class ItemService {
       }
     ];
 
-    // Seed initial stock moves for opening stock
     this.items.forEach(item => {
       if (item.trackInventory && item.openingStock > 0) {
         this.stockMoves.push({
@@ -99,7 +98,6 @@ class ItemService {
     localStorage.setItem('klencare_assemblies', JSON.stringify(this.assemblies));
   }
 
-  // Fix: Return sync data to satisfy UI expectations while remaining awaitable
   getItems(filters: any = {}, page: number = 1, pageSize: number = 10) {
     let filtered = [...this.items];
     if (filters.search) {
@@ -136,7 +134,6 @@ class ItemService {
     };
     this.items.push(newItem);
     
-    // Log initial stock move if opening stock is provided
     if (newItem.trackInventory && newItem.openingStock > 0) {
       this.addStockMove({
         itemId: newItem.id,
@@ -172,7 +169,6 @@ class ItemService {
     if (item && user) auditService.log(user, 'DELETE', 'ITEM', id, `Deleted item ${item.name}`);
   }
 
-  // Fix: Robust stock calculation supporting both item object and ID
   calculateStock(itemOrId: any, warehouseId?: string) {
     const itemId = typeof itemOrId === 'string' ? itemOrId : itemOrId.id;
     let moves = this.stockMoves.filter(m => m.itemId === itemId);
@@ -182,7 +178,6 @@ class ItemService {
     return moves.reduce((total: number, m: any) => total + (Number(m.inQty) - Number(m.outQty)), 0);
   }
 
-  // New: Method required by ItemDetail.tsx
   getStockByItem(itemId: string) {
     const moves = this.stockMoves.filter(m => m.itemId === itemId);
     const balance: Record<string, number> = {};
@@ -192,12 +187,10 @@ class ItemService {
     return { moves, balance };
   }
 
-  // New: Method required by Adjustments.tsx
   getAdjustments() {
     return this.stockMoves.filter(m => m.refType === 'ADJUSTMENT');
   }
 
-  // New: Method required by Dashboard.tsx
   calculateInventoryValue() {
     return this.items.reduce((sum, item) => {
       const stock = this.calculateStock(item.id);
@@ -205,12 +198,10 @@ class ItemService {
     }, 0);
   }
 
-  // New: Method required by Dashboard.tsx and Backup.service.ts
   getStockMoves() {
     return this.stockMoves;
   }
 
-  // New: Method required by Adjustments.tsx and other services
   addStockMove(move: Partial<StockMove>) {
     const newMove: StockMove = {
       id: `MOVE-${Math.random().toString(36).substr(2, 9)}`,
@@ -228,7 +219,6 @@ class ItemService {
     return newMove;
   }
 
-  // New: Methods required by Assemblies.tsx
   getAssemblies() {
     return this.assemblies;
   }
@@ -253,7 +243,6 @@ class ItemService {
     const finishedItem = this.getItemById(assy.finishedItemId);
     if (!finishedItem) throw new Error("Finished item not found");
 
-    // Check component stock
     const allowNegative = this.getSettings().allowNegativeStock;
     if (!allowNegative) {
       assy.components.forEach(comp => {
@@ -266,7 +255,6 @@ class ItemService {
 
     const refNo = `BUILD-${Date.now().toString().slice(-6)}`;
 
-    // Consume components
     assy.components.forEach(comp => {
       this.addStockMove({
         itemId: comp.itemId,
@@ -279,7 +267,6 @@ class ItemService {
       });
     });
 
-    // Produce finished item
     this.addStockMove({
       itemId: finishedItem.id,
       warehouseId,
@@ -294,14 +281,24 @@ class ItemService {
   }
 
   getSettings() { 
-    return JSON.parse(localStorage.getItem('klencare_settings') || '{"companyName": "KlenCare Tech", "currency": "AED", "allowNegativeStock": false}'); 
+    const defaults = {
+      companyName: "KlenCare CRM",
+      companyAddress: "Dubai, United Arab Emirates",
+      companyPhone: "+971 4 000 0000",
+      companyEmail: "info@klencare.com",
+      currency: "AED",
+      vatNumber: "",
+      allowNegativeStock: false,
+      pdfFooter: "Thank you for your business. KlenCare CRM",
+      logoUrl: "https://res.cloudinary.com/dkro3vzx5/image/upload/Gemini_Generated_Image_o6s2wbo6s2wbo6s2.png"
+    };
+    return JSON.parse(localStorage.getItem('klencare_settings') || JSON.stringify(defaults)); 
   }
 
   updateSettings(settings: any) {
     localStorage.setItem('klencare_settings', JSON.stringify(settings));
   }
 
-  // Fix: Handle no arguments to check all items
   getLowStockItems(items?: Item[]) {
     const list = items || this.items;
     return list.filter(i => {
@@ -315,9 +312,7 @@ class ItemService {
     return [{ id: 'WH01', name: 'Main Warehouse', location: 'Dubai' }];
   }
 
-  // New: Method required by ImportGRN.tsx
   findOrCreateWarehouse(name: string) {
-    // In this mock, we only have one warehouse
     return this.getWarehouses()[0];
   }
 }

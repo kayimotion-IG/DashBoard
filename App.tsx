@@ -5,9 +5,10 @@ import {
   LayoutDashboard, Package, ShoppingCart, Truck, Users, 
   BarChart3, FileText, LogOut, Search, Bell, 
   ChevronDown, ChevronRight, Plus, Menu, X, 
-  Boxes, ShieldCheck, Settings as SettingsIcon, ClipboardList, Database, Activity,
-  FileMinus
+  Boxes, ShieldCheck, Settings as SettingsIcon, Database, Activity,
+  FileSpreadsheet
 } from 'lucide-react';
+
 import Dashboard from './views/Dashboard';
 import ItemsList from './views/ItemsList';
 import ItemForm from './views/items/ItemForm';
@@ -29,6 +30,7 @@ import DeliveryChallanList from './views/sales/DeliveryChallanList';
 import DeliveryChallanForm from './views/sales/DeliveryChallanForm';
 import PaymentReceivedList from './views/sales/PaymentReceivedList';
 import PaymentReceivedForm from './views/sales/PaymentReceivedForm';
+import Statements from './views/sales/Statements';
 import Vendors from './views/purchases/Vendors';
 import VendorForm from './views/purchases/VendorForm';
 import PurchaseOrders from './views/purchases/PurchaseOrders';
@@ -47,16 +49,19 @@ import Backup from './views/admin/Backup';
 import Health from './views/Health';
 import Login from './views/auth/Login';
 import Unauthorized from './views/errors/Unauthorized';
-import { User, Role, Permission } from './types';
+import { User, Role, Permission, AppSettings } from './types';
 import { hasPermission } from './config/permissions';
 import { auditService } from './services/audit.service';
+import { itemService } from './services/item.service';
 
-// --- Auth Context ---
 interface AuthContextType {
   user: User | null;
+  loading: boolean;
   login: (email: string, pass: string) => Promise<boolean>;
   logout: () => void;
   can: (p: Permission) => boolean;
+  settings: AppSettings;
+  refreshSettings: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -67,9 +72,8 @@ export const useAuth = () => {
   return context;
 };
 
-// --- Sidebar Configuration ---
 const SIDEBAR_GROUPS = [
-  { label: 'Home', icon: <LayoutDashboard size={20} />, path: '/', permission: 'items.view' },
+  { label: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/' },
   { label: 'Items', icon: <Package size={20} />, path: '/items', permission: 'items.view' },
   { 
     label: 'Inventory', 
@@ -92,6 +96,7 @@ const SIDEBAR_GROUPS = [
       { label: 'Invoices', path: '/sales/invoices' },
       { label: 'Credit Notes', path: '/sales/credit-notes' },
       { label: 'Payments Received', path: '/sales/payments' },
+      { label: 'Statements', path: '/sales/statements' },
     ] 
   },
   { 
@@ -120,12 +125,7 @@ const SIDEBAR_GROUPS = [
   },
 ];
 
-interface SidebarItemProps {
-  item: any;
-  depth?: number;
-}
-
-const SidebarItem: React.FC<SidebarItemProps> = ({ item, depth = 0 }) => {
+const SidebarItem: React.FC<{item: any, depth?: number}> = ({ item, depth = 0 }) => {
   const { can } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
@@ -139,14 +139,14 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ item, depth = 0 }) => {
     <div 
       className={`
         flex items-center justify-between px-4 py-2.5 mx-2 rounded-lg cursor-pointer transition-all duration-200
-        ${isActive ? 'bg-[#f97316] text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}
+        ${isActive ? 'bg-[#fbaf0f] text-slate-900 shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}
         ${depth > 0 ? 'ml-8 text-sm py-2' : ''}
       `}
       onClick={() => hasChildren && setIsOpen(!isOpen)}
     >
       <div className="flex items-center gap-3">
-        {item.icon && <span className={isActive ? 'text-white' : 'text-slate-500'}>{item.icon}</span>}
-        <span className="font-medium">{item.label}</span>
+        {item.icon && <span className={isActive ? 'text-slate-900' : 'text-slate-500'}>{item.icon}</span>}
+        <span className="font-bold">{item.label}</span>
       </div>
       {hasChildren && (
         <span>{isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span>
@@ -160,7 +160,7 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ item, depth = 0 }) => {
         <Link to={item.path}>{content}</Link>
       ) : content}
       
-      {hasChildren && isOpen && (
+      {hasChildren && (isOpen || isActive) && (
         <div className="mt-1 flex flex-col gap-1">
           {item.children.map((child: any) => (
             <SidebarItem key={child.path} item={child} depth={depth + 1} />
@@ -173,14 +173,23 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ item, depth = 0 }) => {
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
   const [isSidebarOpen, setSidebarOpen] = useState(true);
+  const [settings, setSettings] = useState<AppSettings>(itemService.getSettings());
   const location = useLocation();
   const navigate = useNavigate();
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('klencare_session');
-    if (savedUser) setUser(JSON.parse(savedUser));
+    const savedSession = localStorage.getItem('klencare_session');
+    if (savedSession) {
+      setUser(JSON.parse(savedSession));
+    }
+    setLoading(false);
   }, []);
+
+  const refreshSettings = () => {
+    setSettings(itemService.getSettings());
+  };
 
   const login = async (email: string, pass: string) => {
     if (email === 'admin@klencare.com' && pass === 'Admin@1234') {
@@ -206,36 +215,48 @@ export default function App() {
     return hasPermission(user.role, permission);
   };
 
+  if (loading) return <div className="h-screen flex items-center justify-center bg-slate-900 text-[#fbaf0f] font-bold tracking-tighter text-2xl">KlenCare Pro</div>;
+
+  if (!user && location.pathname !== '/login') {
+    return <Navigate to="/login" replace />;
+  }
+
   if (location.pathname === '/login') {
     return <Login onLogin={login} />;
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, can }}>
-      <div className="flex h-screen bg-slate-50">
-        <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 transition-transform duration-300 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 border-r border-slate-800`}>
-          <div className="flex items-center justify-between h-16 px-6 border-b border-slate-800">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-[#f97316] rounded-lg flex items-center justify-center font-bold text-white shadow-lg">K</div>
-              <span className="text-xl font-bold text-white tracking-tight">KlenCare <span className="text-[#2563eb]">CRM</span></span>
-            </div>
-            <button className="lg:hidden text-slate-400" onClick={() => setSidebarOpen(false)}><X size={20} /></button>
+    <AuthContext.Provider value={{ user, loading, login, logout, can, settings, refreshSettings }}>
+      <div className="flex h-screen bg-slate-50 overflow-hidden">
+        <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 transition-transform duration-300 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 border-r border-slate-800 shrink-0 shadow-2xl`}>
+          <div className="flex items-center justify-center h-28 px-6 border-b border-slate-800/50">
+            <Link to="/" className="w-full flex justify-center py-4">
+              {settings.logoUrl ? (
+                <img src={settings.logoUrl} alt="KlenCare Logo" className="h-20 w-auto object-contain max-w-[200px]" />
+              ) : (
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 bg-[#fbaf0f] rounded-lg flex items-center justify-center font-black text-slate-900 shadow-lg text-lg">K</div>
+                  <span className="text-xl font-bold text-white tracking-tight">KlenCare <span className="text-[#fbaf0f]">CRM</span></span>
+                </div>
+              )}
+            </Link>
+            <button className="lg:hidden absolute right-4 text-slate-400" onClick={() => setSidebarOpen(false)}><X size={20} /></button>
           </div>
 
-          <nav className="mt-6 sidebar-scroll overflow-y-auto h-[calc(100vh-120px)] pb-20">
+          <nav className="mt-6 sidebar-scroll overflow-y-auto h-[calc(100vh-140px)] pb-20">
             {SIDEBAR_GROUPS.map((item, idx) => (
               <SidebarItem key={idx} item={item} />
             ))}
           </nav>
 
-          <div className="absolute bottom-0 w-full p-4 border-t border-slate-800 bg-slate-900">
+          <div className="absolute bottom-0 w-full p-4 border-t border-slate-800 bg-slate-900/50 backdrop-blur-md">
             <div className="flex items-center gap-3 px-2 py-2">
-              <div className="w-8 h-8 rounded-full bg-[#2563eb] flex items-center justify-center text-[10px] font-bold text-white">
-                {user?.name.split(' ').map(n => n[0]).join('')}
+              <div className="w-8 h-8 rounded-full bg-[#fbaf0f] flex items-center justify-center text-[10px] font-bold text-slate-900 uppercase">
+                {user?.name?.substring(0,2) || '??'}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-white truncate">{user?.name}</p>
-                <p className="text-[10px] text-[#f97316] uppercase tracking-wider font-bold">{user?.role}</p>
+                <p className="text-[10px] text-[#fbaf0f] uppercase tracking-wider font-bold">{user?.role}</p>
               </div>
               <button onClick={logout} className="text-slate-400 hover:text-white transition-colors"><LogOut size={18} /></button>
             </div>
@@ -247,26 +268,26 @@ export default function App() {
             <div className="flex items-center gap-4">
               <button className="lg:hidden text-slate-500" onClick={() => setSidebarOpen(true)}><Menu size={24} /></button>
               <div className="relative group">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#2563eb]" size={18} />
-                <input type="text" placeholder="Search records..." className="bg-slate-100 border-transparent focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-[#2563eb] rounded-full py-2 pl-10 pr-4 w-64 lg:w-96 outline-none text-sm transition-all" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#fbaf0f]" size={18} />
+                <input type="text" placeholder="Search records..." className="bg-slate-100 border-transparent focus:bg-white focus:ring-2 focus:ring-amber-100 focus:border-[#fbaf0f] rounded-full py-2 pl-10 pr-4 w-64 lg:w-96 outline-none text-sm transition-all" />
               </div>
             </div>
 
             <div className="flex items-center gap-4">
-              <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-blue-50 text-[#2563eb] rounded-full text-[10px] font-bold border border-blue-100">
-                <ShieldCheck size={14} /> {user?.role.toUpperCase()} ACCESS
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-amber-50 text-[#e59b00] rounded-full text-[10px] font-black border border-amber-100">
+                <ShieldCheck size={14} /> {user?.role?.toUpperCase()} ACCESS
               </div>
               <button className="p-2 text-slate-500 hover:bg-slate-100 rounded-full relative">
                 <Bell size={20} />
-                <span className="absolute top-2 right-2 w-2 h-2 bg-[#f97316] rounded-full border-2 border-white"></span>
+                <span className="absolute top-2 right-2 w-2 h-2 bg-[#fbaf0f] rounded-full border-2 border-white"></span>
               </button>
-              <button onClick={() => navigate('/items/new')} className="flex items-center gap-2 px-4 py-2 bg-[#f97316] text-white rounded-xl hover:bg-orange-700 transition-all shadow-lg active:scale-95">
-                <Plus size={18} /> <span className="text-sm font-bold hidden sm:inline">Quick Create</span>
+              <button onClick={() => navigate('/items/new')} className="flex items-center gap-2 px-4 py-2 bg-[#fbaf0f] text-slate-900 rounded-xl hover:bg-[#e59b00] transition-all shadow-lg active:scale-95 font-bold">
+                <Plus size={18} /> <span className="text-sm hidden sm:inline">Quick Entry</span>
               </button>
             </div>
           </header>
 
-          <main className="flex-1 overflow-y-auto p-6 bg-slate-50">
+          <main className="flex-1 overflow-y-auto p-6 bg-slate-50 relative">
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/items" element={<ItemsList />} />
@@ -291,6 +312,7 @@ export default function App() {
               <Route path="/sales/delivery-challans/new" element={<DeliveryChallanForm />} />
               <Route path="/sales/payments" element={<PaymentReceivedList />} />
               <Route path="/sales/payments/new" element={<PaymentReceivedForm />} />
+              <Route path="/sales/statements" element={<Statements />} />
               <Route path="/purchases/vendors" element={<Vendors />} />
               <Route path="/purchases/vendors/new" element={<VendorForm />} />
               <Route path="/purchases/vendors/edit/:id" element={<VendorForm />} />
