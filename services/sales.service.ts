@@ -1,4 +1,3 @@
-
 import { 
   Customer, SalesOrder, DeliveryChallan, 
   Invoice, PaymentReceived, CreditNote, SalesReturn 
@@ -98,7 +97,6 @@ class SalesService {
       .filter(i => i.customerId === customerId && i.status !== 'Voided')
       .reduce((s, i) => s + (Number(i.balanceDue) || 0), 0);
     
-    // Logic: Open Credit Notes reduce the customer's liability
     const creditAvailable = this.creditNotes
       .filter(cn => cn.customerId === customerId && cn.status === 'Open')
       .reduce((s, cn) => s + (Number(cn.amount) || 0), 0);
@@ -114,13 +112,11 @@ class SalesService {
   getPaymentsReceived() { return this.payments; }
   getCreditNotes() { return this.creditNotes; }
   
-  // Fix: Added createDelivery method to handle fulfillment from SO or manual entry
   createDelivery(dataOrSoId: any, userOrWarehouseId: any, maybeUser?: any) {
     let dc: DeliveryChallan;
     let user: any;
 
     if (typeof dataOrSoId === 'string') {
-      // Called from SalesOrderDetail: createDelivery(soId, warehouseId, user)
       const soId = dataOrSoId;
       const warehouseId = userOrWarehouseId;
       user = maybeUser;
@@ -137,10 +133,8 @@ class SalesService {
         lines: so.lines.map(l => ({ itemId: l.itemId, quantity: l.quantity }))
       };
 
-      // Update SO status
       this.updateSOStatus(so.id, 'Shipped', user);
     } else {
-      // Called from DeliveryChallanForm: createDelivery(data, user)
       const data = dataOrSoId;
       user = userOrWarehouseId;
       dc = {
@@ -153,7 +147,6 @@ class SalesService {
       };
     }
 
-    // Process stock moves for the DC fulfillment
     dc.lines.forEach(line => {
       itemService.addStockMove({
         itemId: line.itemId,
@@ -215,6 +208,7 @@ class SalesService {
     const inv: Invoice = {
       id: `INV-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
       invoiceNumber: data.invoiceNumber || `INV-${Date.now().toString().slice(-5)}`,
+      lpoNumber: data.lpoNumber || '', // FIXED: Explicitly map the LPO number from input data
       soId: data.soId || '',
       customerId: data.customerId,
       date: data.date || new Date().toISOString(),
@@ -222,7 +216,6 @@ class SalesService {
       total: Number(data.total),
       balanceDue: Number(data.total),
       status: 'Sent',
-      // Production fix: ensure manual invoices have at least one valid line for PDF rendering
       lines: data.lines?.length > 0 ? data.lines : [{
         id: 'L1',
         itemId: 'MANUAL',

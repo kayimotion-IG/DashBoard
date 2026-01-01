@@ -1,4 +1,3 @@
-
 import { Item, StockMove, Warehouse, Assembly } from '../types';
 import { auditService } from './audit.service';
 
@@ -243,7 +242,6 @@ class ItemService {
     const finishedItem = this.getItemById(assy.finishedItemId);
     if (!finishedItem) throw new Error("Finished item not found");
 
-    // Correcting corrupted line to check if negative stock is allowed from settings
     if (!this.getSettings().allowNegativeStock) {
       assy.components.forEach(comp => {
         const available = this.calculateStock(comp.itemId, warehouseId);
@@ -282,14 +280,14 @@ class ItemService {
 
   getSettings() { 
     const defaults = {
-      companyName: "KLENCARE Fzc",
+      companyName: "KLENCARE FZC",
       companyAddress: "9, Rolex Tower, Dubai, UAE",
       companyPhone: "050-315-7462",
       companyEmail: "support@klencare.net",
       currency: "AED",
       vatNumber: "",
       allowNegativeStock: false,
-      pdfFooter: "Thank you for your business. KLENCARE Fzc",
+      pdfFooter: "Thank you for your business. KLENCARE FZC",
       logoUrl: "https://res.cloudinary.com/dkro3vzx5/image/upload/Gemini_Generated_Image_o6s2wbo6s2wbo6s2.png"
     };
     return JSON.parse(localStorage.getItem('klencare_settings') || JSON.stringify(defaults)); 

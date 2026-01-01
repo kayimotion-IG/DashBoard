@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @page { size: A4; margin: 14mm; }
+        body { font-family: 'Helvetica', 'Arial', sans-serif; color: #1e293b; margin: 0; padding: 0; line-height: 1.4; }
+        
+        .header { display: flex; justify-content: space-between; margin-bottom: 30px; }
+        .company-info { width: 50%; }
+        /* Only KlenCare FZC in Blue */
+        .brand-name { color: #0B4AA2; font-weight: bold; font-size: 22px; margin-bottom: 8px; }
+        /* Matched Typography: Phone/Email same as Address lines */
+        .address-line { font-size: 11px; margin: 2px 0; color: #1e293b; font-weight: normal; }
+        
+        .doc-title { text-align: right; width: 40%; }
+        .doc-title h1 { margin: 0; font-size: 32px; color: #1e293b; letter-spacing: -1px; }
+        /* Gold Accent Color */
+        .gold-bar { height: 4px; background: #fbaf0f; width: 100px; margin-left: auto; margin-top: 5px; }
+        
+        .meta-container { display: flex; justify-content: space-between; margin-top: 40px; margin-bottom: 40px; }
+        .bill-to { border: 1px solid #e2e8f0; border-radius: 4px; padding: 18px; width: 45%; }
+        .label-gold { color: #fbaf0f; font-size: 10px; font-weight: bold; margin-bottom: 10px; text-transform: uppercase; }
+        .bill-to-name { font-weight: bold; font-size: 14px; margin-bottom: 5px; }
+        
+        .doc-meta { width: 40%; font-size: 12px; }
+        .meta-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f1f5f9; }
+        .meta-label { color: #fbaf0f; font-weight: bold; font-size: 10px; text-transform: uppercase; }
+        .meta-value { font-weight: bold; color: #1e293b; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        /* Gold Header */
+        th { background: #fbaf0f; color: white; text-align: left; padding: 14px; font-size: 11px; text-transform: uppercase; }
+        td { padding: 12px; border-bottom: 1px solid #e2e8f0; font-size: 11px; color: #334155; }
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+
+        .summary-container { display: flex; justify-content: flex-end; margin-top: 30px; }
+        .summary-box { width: 40%; }
+        .summary-row { display: flex; justify-content: space-between; padding: 10px 0; font-size: 12px; color: #64748b; }
+        /* Gold Power Box */
+        .total-row { background: #fbaf0f; color: white; padding: 15px; border-radius: 4px; font-weight: bold; font-size: 18px; margin-top: 15px; }
+
+        .payment-box { border: 1px solid #e2e8f0; border-radius: 4px; padding: 18px; margin-top: 50px; width: 50%; font-size: 11px; }
+        
+        .footer { position: fixed; bottom: 0; width: 100%; font-size: 10px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="company-info">
+            <div class="brand-name">KlenCare FZC</div>
+            <div class="address-line">9 Rolex Tower</div>
+            <div class="address-line">Shk Zayed Road</div>
+            <div class="address-line">Dubai- U.A.E</div>
+            <div class="address-line">+97150 315 7462</div>
+            <div class="address-line">support@klencare.net</div>
+        </div>
+        <div class="doc-title">
+            <h1>TAX INVOICE</h1>
+            <div class="gold-bar"></div>
+        </div>
+    </div>
+
+    <div class="meta-container">
+        <div class="bill-to">
+            <div class="label-gold">BILL TO</div>
+            <div class="bill-to-name">Customer Name</div>
+            <div class="address-line">Customer Full Business Address</div>
+            <div class="address-line">City, UAE</div>
+        </div>
+        <div class="doc-meta">
+            <div class="meta-row">
+                <span class="meta-label">Invoice #</span>
+                <span class="meta-value">INV-57896</span>
+            </div>
+            <div class="meta-row">
+                <span class="meta-label">Date</span>
+                <span class="meta-value">20 May 2024</span>
+            </div>
+            <div class="meta-row">
+                <span class="meta-label">Due Date</span>
+                <span class="meta-value">20 Jun 2024</span>
+            </div>
+            <div class="meta-row">
+                <span class="meta-label">TRN</span>
+                <span class="meta-value">100234567800003</span>
+            </div>
+            <div class="meta-row">
+                <span class="meta-label">LPO No</span>
+                <span class="meta-value">{{lpo_number}}</span>
+            </div>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th width="5%">#</th>
+                <th width="55%">Item Description</th>
+                <th width="10%" class="text-center">Qty</th>
+                <th width="15%" class="text-right">Rate (AED)</th>
+                <th width="15%" class="text-right">Total (AED)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>1</td>
+                <td>Premium Industrial Solution X-Grade</td>
+                <td class="text-center">1</td>
+                <td class="text-right">100.00</td>
+                <td class="text-right">100.00</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="summary-container">
+        <div class="summary-box">
+            <div class="summary-row">
+                <span>Sub Total</span>
+                <span class="text-right" style="color: #1e293b; font-weight: bold;">AED 100.00</span>
+            </div>
+            <div class="summary-row">
+                <span>VAT (5%)</span>
+                <span class="text-right" style="color: #1e293b; font-weight: bold;">AED 5.00</span>
+            </div>
+            <div class="total-row">
+                <span>TOTAL AED</span>
+                <span class="text-right">105.00</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="payment-box">
+        <div class="label-gold">PAYMENT METHOD</div>
+        <div class="address-line">Bank : RAKBANK</div>
+        <div class="address-line">Account Name : KlenCare FZC</div>
+        <div class="address-line">Account No. : 0323438159001</div>
+    </div>
+
+    <div class="footer">
+        <div style="display: flex; justify-content: space-between;">
+            <span>Thank you for choosing KlenCare FZC.</span>
+            <span>Page 1 of 1</span>
+        </div>
+    </div>
+</body>
+</html>

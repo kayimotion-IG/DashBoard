@@ -1,9 +1,9 @@
-
 import React, { useState, useMemo } from 'react';
 import { 
   FileText, Search, Printer, CalendarDays, 
   ArrowRight, Download, Filter, User as UserIcon, 
-  Wallet, ShieldCheck, Mail, X, Edit3, Send, CheckCircle2
+  Wallet, ShieldCheck, Mail, X, Edit3, Send, CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 import { salesService } from '../../services/sales.service';
 import { pdfService } from '../../services/pdf.service';
@@ -15,6 +15,7 @@ export default function Statements() {
   const [search, setSearch] = useState('');
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [composeData, setComposeData] = useState({
+    recipientEmail: '',
     subject: 'Statement of Account from KlenCare CRM',
     notes: 'Please find your latest statement of account attached. Kindly review and settle any outstanding balances.',
     includeInvoices: true
@@ -44,10 +45,18 @@ export default function Statements() {
 
   const openComposer = (cust: Customer) => {
     setEditingCustomer(cust);
+    setComposeData({
+      ...composeData,
+      recipientEmail: cust.email || ''
+    });
     setIsSent(false);
   };
 
   const handleSendEmail = () => {
+    if (!composeData.recipientEmail || !composeData.recipientEmail.includes('@')) {
+      alert('Please enter a valid recipient email address.');
+      return;
+    }
     // Logic for sending email would go here. For now, we simulate.
     setIsSent(true);
     setTimeout(() => {
@@ -112,7 +121,14 @@ export default function Statements() {
                           {cust.name[0]}
                         </div>
                         <div>
-                          <p className="text-base font-bold text-slate-900">{cust.name}</p>
+                          <div className="flex items-center gap-2">
+                             <p className="text-base font-bold text-slate-900">{cust.name}</p>
+                             {!cust.email && (
+                               <span className="p-1 bg-rose-50 text-rose-500 rounded-md" title="Email missing">
+                                 <AlertCircle size={12} />
+                               </span>
+                             )}
+                          </div>
                           <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-0.5">{cust.companyName}</p>
                         </div>
                       </div>
@@ -146,8 +162,8 @@ export default function Statements() {
                         </button>
                         <button 
                           onClick={() => openComposer(cust)}
-                          className="p-3 text-slate-400 hover:text-blue-600 bg-white border border-slate-200 rounded-xl transition-all shadow-sm hover:shadow-md active:scale-95"
-                          title="Manual Edit & Send"
+                          className={`p-3 border rounded-xl transition-all shadow-sm hover:shadow-md active:scale-95 ${!cust.email ? 'text-rose-500 border-rose-200 bg-rose-50 animate-pulse' : 'text-slate-400 border-slate-200 bg-white hover:text-blue-600'}`}
+                          title="Enter Email & Send"
                         >
                            <Mail size={20} />
                         </button>
@@ -170,7 +186,7 @@ export default function Statements() {
         </div>
       </div>
 
-      {/* MANUAL EDIT & COMPOSE MODAL */}
+      {/* MANUAL EMAIL EDIT & COMPOSE MODAL */}
       {editingCustomer && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-8 bg-slate-900/90 backdrop-blur-md animate-in fade-in">
           <div className="bg-white w-full max-w-3xl rounded-[40px] shadow-2xl overflow-hidden flex flex-col border border-white/20 animate-in zoom-in-95 duration-300">
@@ -178,8 +194,8 @@ export default function Statements() {
               <div className="flex items-center gap-4">
                  <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl shadow-sm"><Edit3 size={24}/></div>
                  <div>
-                    <h3 className="font-black text-slate-900 uppercase tracking-widest text-sm">Statement Composer</h3>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Edit details for {editingCustomer.name}</p>
+                    <h3 className="font-black text-slate-900 uppercase tracking-widest text-sm">Manual Statement Dispatch</h3>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Drafting for {editingCustomer.name}</p>
                  </div>
               </div>
               <button onClick={() => setEditingCustomer(null)} className="p-2.5 text-slate-400 hover:text-rose-500 transition-colors bg-white rounded-xl shadow-sm"><X size={20} /></button>
@@ -190,19 +206,42 @@ export default function Statements() {
                 <div className="h-full flex flex-col items-center justify-center text-center py-20 space-y-6 animate-in zoom-in">
                    <div className="w-24 h-24 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center shadow-inner"><CheckCircle2 size={64} /></div>
                    <div>
-                     <h4 className="text-2xl font-black text-slate-900">Successfully Prepared</h4>
-                     <p className="text-slate-500 mt-2">The statement has been updated and queued for dispatch.</p>
+                     <h4 className="text-2xl font-black text-slate-900">Queue Synchronized</h4>
+                     <p className="text-slate-500 mt-2">The statement has been processed and is ready for the next dispatch cycle.</p>
                    </div>
                 </div>
               ) : (
                 <div className="space-y-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1">Email Subject Line</label>
-                    <input 
-                      value={composeData.subject} 
-                      onChange={e => setComposeData({...composeData, subject: e.target.value})}
-                      className="w-full px-5 py-3.5 border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 font-bold !bg-white !text-slate-900" 
-                    />
+                  {!editingCustomer.email && (
+                    <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-start gap-3 text-rose-700 animate-pulse">
+                      <AlertCircle size={20} className="shrink-0" />
+                      <p className="text-xs font-bold">This customer has no email address in the system. Please enter one manually below to proceed.</p>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1">Recipient Email Address *</label>
+                      <div className="relative">
+                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                        <input 
+                          type="email"
+                          required
+                          value={composeData.recipientEmail} 
+                          onChange={e => setComposeData({...composeData, recipientEmail: e.target.value})}
+                          placeholder="Enter email address manually..."
+                          className="w-full pl-12 pr-4 py-3.5 border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 font-bold !bg-white !text-slate-900 shadow-inner" 
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1">Email Subject Line</label>
+                      <input 
+                        value={composeData.subject} 
+                        onChange={e => setComposeData({...composeData, subject: e.target.value})}
+                        className="w-full px-5 py-3.5 border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 font-bold !bg-white !text-slate-900 shadow-inner" 
+                      />
+                    </div>
                   </div>
 
                   <div className="space-y-2">
@@ -211,29 +250,21 @@ export default function Statements() {
                       rows={4}
                       value={composeData.notes}
                       onChange={e => setComposeData({...composeData, notes: e.target.value})}
-                      className="w-full px-5 py-3.5 border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 text-sm leading-relaxed !bg-white !text-slate-900"
+                      className="w-full px-5 py-3.5 border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 text-sm leading-relaxed !bg-white !text-slate-900 shadow-inner"
                     />
                   </div>
 
                   <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 flex items-center justify-between">
                      <div>
-                        <p className="text-sm font-black text-slate-900">Include Invoice Ledger</p>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Toggle detailed list of all open invoices</p>
+                        <p className="text-sm font-black text-slate-900">Include Detailed Ledger</p>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Show every transaction for the selected period</p>
                      </div>
                      <input 
                       type="checkbox" 
                       checked={composeData.includeInvoices} 
                       onChange={e => setComposeData({...composeData, includeInvoices: e.target.checked})}
-                      className="w-6 h-6 accent-brand rounded-lg" 
+                      className="w-6 h-6 accent-brand rounded-lg shadow-sm" 
                      />
-                  </div>
-
-                  <div className="p-6 bg-blue-50 rounded-3xl border border-blue-100">
-                    <div className="flex items-center gap-3 text-blue-700 mb-2">
-                      <Printer size={18} />
-                      <span className="text-xs font-black uppercase tracking-widest">Manual Override Active</span>
-                    </div>
-                    <p className="text-xs text-blue-600 font-medium leading-relaxed">Changes made here will be reflected in the generated PDF for this specific instance. No permanent ledger data is altered.</p>
                   </div>
                 </div>
               )}
