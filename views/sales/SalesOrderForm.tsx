@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, Plus, Trash2, Save, ShoppingCart, 
-  Package
+  Package, CheckCircle2, FileText
 } from 'lucide-react';
 import { useAuth } from '../../App';
 import { salesService } from '../../services/sales.service';
@@ -17,6 +17,7 @@ export default function SalesOrderForm() {
 
   const [formData, setFormData] = useState({
     customerId: '',
+    lpoNumber: '',
     date: new Date().toISOString().split('T')[0],
     notes: ''
   });
@@ -54,20 +55,24 @@ export default function SalesOrderForm() {
   const taxTotal = subTotal * 0.05;
   const total = subTotal + taxTotal;
 
-  const handleSubmit = (e?: React.FormEvent) => {
+  const handleSubmit = (e?: React.FormEvent, shouldConfirm: boolean = false) => {
     if (e) e.preventDefault();
     if (!formData.customerId || lines.some(l => !l.itemId)) {
       alert('Please select a customer and at least one item.');
       return;
     }
 
-    salesService.createSO({
+    const newSO = salesService.createSO({
       ...formData,
       lines,
       subTotal,
       taxTotal,
       total
     }, user);
+    
+    if (shouldConfirm) {
+      salesService.updateSOStatus(newSO.id, 'Confirmed', user);
+    }
     
     navigate('/sales/orders');
   };
@@ -76,7 +81,7 @@ export default function SalesOrderForm() {
     <div className="max-w-6xl mx-auto space-y-6 pb-20">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <button onClick={() => navigate('/sales/orders')} className="p-2 hover:bg-slate-200 rounded-full transition-all text-slate-500">
+          <button onClick={() => navigate('/sales/orders')} className="p-2 hover:bg-slate-200 rounded-full transition-all text-slate-500 bg-white border">
             <ArrowLeft size={20} />
           </button>
           <div>
@@ -85,20 +90,30 @@ export default function SalesOrderForm() {
           </div>
         </div>
         <div className="flex gap-3">
-          <button onClick={() => navigate('/sales/orders')} className="px-6 py-2 border border-slate-200 text-slate-700 rounded-xl font-bold text-sm bg-white !text-slate-900">Cancel</button>
+          <button onClick={() => navigate('/sales/orders')} className="px-6 py-2.5 border border-slate-200 text-slate-700 rounded-xl font-bold text-sm bg-white hover:bg-slate-50">Cancel</button>
+          
           <button 
-            type="submit"
-            form="so-form"
-            className="flex items-center gap-2 px-8 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-bold text-sm shadow-xl active:scale-95 transition-all"
+            type="button"
+            onClick={(e) => handleSubmit(undefined, false)}
+            className="flex items-center gap-2 px-6 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 font-bold text-sm shadow-sm transition-all active:scale-95"
           >
             <Save size={18} />
-            Save Order
+            Save as Draft
+          </button>
+
+          <button 
+            type="button"
+            onClick={(e) => handleSubmit(undefined, true)}
+            className="flex items-center gap-2 px-8 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-bold text-sm shadow-xl shadow-blue-500/20 active:scale-95 transition-all"
+          >
+            <CheckCircle2 size={18} />
+            Save & Confirm Order
           </button>
         </div>
       </div>
 
-      <form id="so-form" onSubmit={handleSubmit} className="space-y-8">
-        <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-2 gap-8">
+      <form id="so-form" onSubmit={(e) => handleSubmit(e, false)} className="space-y-8">
+        <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="space-y-1">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Customer *</label>
             <select 
@@ -110,6 +125,18 @@ export default function SalesOrderForm() {
               <option value="">Select a customer...</option>
               {customers.map(c => <option key={c.id} value={c.id}>{c.name} ({c.companyName})</option>)}
             </select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">LPO # (Customer PO)</label>
+            <div className="relative">
+              <FileText className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
+              <input 
+                value={formData.lpoNumber}
+                onChange={e => setFormData({...formData, lpoNumber: e.target.value})}
+                placeholder="e.g. 136825"
+                className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl outline-none text-sm !bg-white !text-slate-900"
+              />
+            </div>
           </div>
           <div className="space-y-1">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Order Date</label>
@@ -176,10 +203,12 @@ export default function SalesOrderForm() {
                     />
                   </td>
                   <td className="px-6 py-4 text-right font-black text-slate-900">
-                    AED {line.total.toLocaleString()}
+                    AED {line.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </td>
                   <td className="px-6 py-4">
-                    <button type="button" onClick={() => handleRemoveItem(line.id)} className="text-slate-300 hover:text-red-500"><Trash2 size={16} /></button>
+                    <button type="button" onClick={() => handleRemoveItem(line.id)} className="text-slate-300 hover:text-red-500 transition-colors">
+                      <Trash2 size={16} />
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -189,15 +218,15 @@ export default function SalesOrderForm() {
              <div className="w-64 space-y-2">
                 <div className="flex justify-between text-xs font-bold text-slate-500 uppercase tracking-widest">
                    <span>Sub Total</span>
-                   <span>AED {subTotal.toLocaleString()}</span>
+                   <span>AED {subTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                 </div>
                 <div className="flex justify-between text-xs font-bold text-slate-500 uppercase tracking-widest">
                    <span>VAT (5%)</span>
-                   <span>AED {taxTotal.toLocaleString()}</span>
+                   <span>AED {taxTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                 </div>
-                <div className="flex justify-between text-lg font-black text-blue-600 border-t pt-2">
+                <div className="flex justify-between text-lg font-black text-blue-600 border-t pt-2 mt-2">
                    <span>Total</span>
-                   <span>AED {total.toLocaleString()}</span>
+                   <span>AED {total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                 </div>
              </div>
           </div>

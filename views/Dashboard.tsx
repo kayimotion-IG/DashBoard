@@ -17,10 +17,13 @@ const Dashboard = () => {
   const navigate = useNavigate();
   
   const sos = salesService.getSalesOrders();
-  const totalRevenue = sos.reduce((sum, s) => sum + s.total, 0);
+  // Gross Revenue = All confirmed Sales Orders
+  const grossRevenue = sos.filter(s => s.status !== 'Draft').reduce((sum, s) => sum + s.total, 0);
+  
   const lowStockCount = itemService.getLowStockItems().length;
   
   const customers = salesService.getCustomers();
+  // Net AR = Invoice Balances - Open Credit Notes
   const arTotal = customers.reduce((sum, c) => sum + salesService.getCustomerBalance(c.id), 0);
   
   const vendors = purchaseService.getVendors();
@@ -29,13 +32,13 @@ const Dashboard = () => {
   const pendingOrders = sos.filter(s => s.status === 'Confirmed' || s.status === 'Draft');
 
   const chartData = [
-    { name: 'Mon', sales: 4000 },
-    { name: 'Tue', sales: 3000 },
-    { name: 'Wed', sales: 5000 },
-    { name: 'Thu', sales: 2780 },
-    { name: 'Fri', sales: 1890 },
-    { name: 'Sat', sales: 2390 },
-    { name: 'Sun', sales: 3490 },
+    { name: 'Mon', sales: 4200 },
+    { name: 'Tue', sales: 3800 },
+    { name: 'Wed', sales: 6100 },
+    { name: 'Thu', sales: 5200 },
+    { name: 'Fri', sales: 4800 },
+    { name: 'Sat', sales: 2900 },
+    { name: 'Sun', sales: 3400 },
   ];
 
   const StatCard = ({ label, value, trend, icon, color, onClick }: any) => (
@@ -49,7 +52,7 @@ const Dashboard = () => {
         </div>
         <div className={`flex items-center gap-1 text-[10px] font-black uppercase tracking-widest ${trend === 'up' ? 'text-emerald-600' : 'text-red-600'}`}>
           {trend === 'up' ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-          {trend === 'up' ? 'Healthy' : 'Action'}
+          {trend === 'up' ? 'Optimal' : 'Needs Action'}
         </div>
       </div>
       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</p>
@@ -62,14 +65,14 @@ const Dashboard = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Executive Summary</h1>
-          <p className="text-slate-500 text-sm">Real-time financials and inventory health in AED.</p>
+          <p className="text-slate-500 text-sm">UAE Region Dashboard · All figures in AED.</p>
         </div>
         <div className="flex items-center gap-3">
            <button 
             onClick={() => navigate('/health')}
             className="flex items-center gap-2 px-6 py-2 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all"
           >
-            <Activity size={16} /> Run System Test
+            <Activity size={16} /> System Diagnostics
           </button>
           <button className="bg-white border border-slate-200 px-4 py-2 rounded-xl flex items-center gap-2 text-xs font-bold text-slate-600 shadow-sm hover:bg-slate-50 transition-all">
             <Filter size={16} />
@@ -79,16 +82,16 @@ const Dashboard = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard label="Receivables (AR)" value={`AED ${arTotal.toLocaleString()}`} trend="up" icon={<Wallet size={20} />} color="bg-blue-600" onClick={() => navigate('/sales/invoices')} />
-        <StatCard label="Payables (AP)" value={`AED ${apTotal.toLocaleString()}`} trend="down" icon={<Truck size={20} />} color="bg-rose-600" onClick={() => navigate('/purchases/bills')} />
-        <StatCard label="Gross Revenue" value={`AED ${totalRevenue.toLocaleString()}`} trend="up" icon={<DollarSign size={20} />} color="bg-emerald-600" onClick={() => navigate('/reports')} />
-        <StatCard label="Inventory Status" value={lowStockCount > 0 ? `${lowStockCount} Low` : 'Optimal'} trend={lowStockCount > 0 ? 'down' : 'up'} icon={<Package size={20} />} color={lowStockCount > 0 ? 'bg-amber-600' : 'bg-indigo-600'} onClick={() => navigate('/inventory/dashboard')} />
+        <StatCard label="Net Receivables (AR)" value={`AED ${arTotal.toLocaleString()}`} trend="up" icon={<Wallet size={20} />} color="bg-blue-600" onClick={() => navigate('/sales/invoices')} />
+        <StatCard label="Net Payables (AP)" value={`AED ${apTotal.toLocaleString()}`} trend="down" icon={<Truck size={20} />} color="bg-rose-600" onClick={() => navigate('/purchases/bills')} />
+        <StatCard label="Confirmed Revenue" value={`AED ${grossRevenue.toLocaleString()}`} trend="up" icon={<DollarSign size={20} />} color="bg-emerald-600" onClick={() => navigate('/reports')} />
+        <StatCard label="Stock Alerts" value={lowStockCount > 0 ? `${lowStockCount} Low` : 'Nominal'} trend={lowStockCount > 0 ? 'down' : 'up'} icon={<Package size={20} />} color={lowStockCount > 0 ? 'bg-amber-600' : 'bg-indigo-600'} onClick={() => navigate('/inventory/dashboard')} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
-            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-8">Cash Flow Analysis (AED)</h3>
+            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-8">Revenue Stream Analysis (AED)</h3>
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={chartData}>
@@ -109,7 +112,10 @@ const Dashboard = () => {
           </div>
 
           <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
-            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-6">Action Required</h3>
+            <div className="flex items-center justify-between mb-6">
+               <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Workflow Queue</h3>
+               <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full uppercase">Priority First</span>
+            </div>
             <div className="space-y-4">
               {pendingOrders.length > 0 ? pendingOrders.slice(0, 3).map((order) => {
                 const cust = salesService.getCustomerById(order.customerId);
@@ -122,13 +128,16 @@ const Dashboard = () => {
                         <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{cust?.name}</p>
                       </div>
                     </div>
-                    <button onClick={() => navigate(`/sales/orders/${order.id}`)} className="p-2 text-slate-300 group-hover:text-blue-600 transition-all"><ChevronRight size={20} /></button>
+                    <div className="flex items-center gap-4">
+                       <span className="text-[10px] font-black text-amber-600 px-2 py-1 bg-amber-50 rounded-lg">{order.status}</span>
+                       <button onClick={() => navigate(`/sales/orders/${order.id}`)} className="p-2 text-slate-300 group-hover:text-blue-600 transition-all"><ChevronRight size={20} /></button>
+                    </div>
                   </div>
                 );
               }) : (
                 <div className="text-center py-10 text-slate-400">
-                  <CheckCircle2 size={40} className="mx-auto mb-4 opacity-20" />
-                  <p className="text-xs font-bold uppercase">All systems nominal</p>
+                  <CheckCircle2 size={40} className="mx-auto mb-4 opacity-20 text-emerald-500" />
+                  <p className="text-xs font-bold uppercase tracking-widest">All processing queues are empty</p>
                 </div>
               )}
             </div>
@@ -137,18 +146,18 @@ const Dashboard = () => {
 
         <div className="space-y-6">
           <div className="bg-slate-900 p-8 rounded-3xl shadow-2xl text-white">
-            <h3 className="text-xs font-black text-blue-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+            <h3 className="text-xs font-black text-[#f97316] uppercase tracking-widest mb-6 flex items-center gap-2">
               <Clock size={16} />
-              Module Shortcuts
+              Quick Actions
             </h3>
             <div className="grid grid-cols-2 gap-3">
               {[
-                { label: 'New SO', path: '/sales/orders/new' },
-                { label: 'New PO', path: '/purchases/orders/new' },
+                { label: 'Create SO', path: '/sales/orders/new' },
+                { label: 'Issue PO', path: '/purchases/orders/new' },
                 { label: 'Stock Adj', path: '/inventory/adjustments' },
-                { label: 'Reports', path: '/reports' }
+                { label: 'Sales Rep', path: '/reports' }
               ].map(link => (
-                <button key={link.label} onClick={() => navigate(link.path)} className="py-3 px-4 bg-slate-800 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all">
+                <button key={link.label} onClick={() => navigate(link.path)} className="py-3 px-4 bg-slate-800 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#2563eb] transition-all">
                   {link.label}
                 </button>
               ))}
@@ -156,24 +165,24 @@ const Dashboard = () => {
           </div>
 
           <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
-             <div className="flex items-center gap-3 mb-4">
+             <div className="flex items-center gap-3 mb-6">
                 <ShieldCheck size={20} className="text-emerald-500" />
-                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">System Health</h3>
+                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Compliance Status</h3>
              </div>
              <div className="space-y-4">
                 <div className="flex justify-between items-center py-2 border-b border-slate-50">
-                   <span className="text-xs text-slate-500">Inventory Sync</span>
-                   <span className="text-[10px] font-black uppercase text-emerald-600 px-2 bg-emerald-50 rounded-full">Active</span>
+                   <span className="text-xs text-slate-500">VAT Reporting</span>
+                   <span className="text-[10px] font-black uppercase text-emerald-600 px-2 bg-emerald-50 rounded-full">Ready</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-slate-50">
-                   <span className="text-xs text-slate-500">Financial Ledger</span>
-                   <span className="text-[10px] font-black uppercase text-emerald-600 px-2 bg-emerald-50 rounded-full">Locked</span>
+                   <span className="text-xs text-slate-500">Audit Trail</span>
+                   <span className="text-[10px] font-black uppercase text-blue-600 px-2 bg-blue-50 rounded-full">Encrypted</span>
                 </div>
                 <button 
                   onClick={() => navigate('/health')}
-                  className="w-full mt-2 py-3 bg-slate-50 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-100 transition-all"
+                  className="w-full mt-4 py-3 bg-[#f97316] text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-orange-200 hover:bg-orange-600 transition-all active:scale-95"
                 >
-                  Diagnostic Logs
+                  Run Compliance Check
                 </button>
              </div>
           </div>

@@ -13,6 +13,8 @@ import { itemService } from '../../services/item.service';
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  
+  // Fix: ItemService methods are now synchronous. getLowStockItems handles check without arguments.
   const lowStock = itemService.getLowStockItems();
   const stockValue = itemService.calculateInventoryValue();
   const totalStock = itemService.getItems({}).total;
@@ -41,7 +43,7 @@ const Dashboard = () => {
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
           <div className="p-2 bg-blue-50 text-blue-600 rounded-lg w-fit mb-4"><DollarSign size={20} /></div>
           <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Inventory Value</p>
-          <h3 className="text-2xl font-black text-slate-900">${stockValue.toLocaleString()}</h3>
+          <h3 className="text-2xl font-black text-slate-900">AED {stockValue.toLocaleString()}</h3>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
           <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg w-fit mb-4"><Package size={20} /></div>
@@ -74,6 +76,7 @@ const Dashboard = () => {
                         {m.inQty > 0 ? <Box size={16} /> : <TrendingUp size={16} className="rotate-90" />}
                       </div>
                       <div>
+                        {/* Fix: itemService.getItemById is now synchronous */}
                         <p className="text-sm font-bold text-slate-900">{item?.name}</p>
                         <p className="text-[10px] text-slate-500 uppercase font-black">{m.refType} · {m.refNo}</p>
                       </div>

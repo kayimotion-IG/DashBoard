@@ -75,7 +75,7 @@ class SalesService {
     };
     this.customers.push(newCust);
     this.saveData();
-    auditService.log(user, 'CREATE', 'CUSTOMER', newCust.id, `Created ${newCust.name}`);
+    if (user) auditService.log(user, 'CREATE', 'CUSTOMER', newCust.id, `Created ${newCust.name}`);
     return newCust;
   }
 
@@ -84,7 +84,7 @@ class SalesService {
     if (idx !== -1) {
       this.customers[idx] = { ...this.customers[idx], ...data };
       this.saveData();
-      auditService.log(user, 'UPDATE', 'CUSTOMER', id, `Updated ${this.customers[idx].name}`);
+      if (user) auditService.log(user, 'UPDATE', 'CUSTOMER', id, `Updated ${this.customers[idx].name}`);
     }
   }
 
@@ -94,18 +94,99 @@ class SalesService {
   }
 
   getCustomerBalance(customerId: string) {
-    return this.invoices
+    const invoiceDue = this.invoices
       .filter(i => i.customerId === customerId && i.status !== 'Voided')
       .reduce((s, i) => s + (Number(i.balanceDue) || 0), 0);
+    
+    // Logic: Open Credit Notes reduce the customer's liability
+    const creditAvailable = this.creditNotes
+      .filter(cn => cn.customerId === customerId && cn.status === 'Open')
+      .reduce((s, cn) => s + (Number(cn.amount) || 0), 0);
+      
+    return Math.max(0, invoiceDue - creditAvailable);
   }
 
   getSalesOrders() { return this.salesOrders; }
   getSOById(id: string) { return this.salesOrders.find(so => so.id === id); }
-
   getInvoices() { return this.invoices; }
   getInvoiceById(id: string) { return this.invoices.find(i => i.id === id); }
   getDeliveries() { return this.deliveryChallans; }
   getPaymentsReceived() { return this.payments; }
+  getCreditNotes() { return this.creditNotes; }
+  
+  // Fix: Added createDelivery method to handle fulfillment from SO or manual entry
+  createDelivery(dataOrSoId: any, userOrWarehouseId: any, maybeUser?: any) {
+    let dc: DeliveryChallan;
+    let user: any;
+
+    if (typeof dataOrSoId === 'string') {
+      // Called from SalesOrderDetail: createDelivery(soId, warehouseId, user)
+      const soId = dataOrSoId;
+      const warehouseId = userOrWarehouseId;
+      user = maybeUser;
+      const so = this.getSOById(soId);
+      if (!so) throw new Error("Sales Order not found");
+
+      dc = {
+        id: `DC-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
+        dcNumber: `DC-${Date.now().toString().slice(-5)}`,
+        soId: so.id,
+        customerId: so.customerId,
+        date: new Date().toISOString(),
+        status: 'Delivered',
+        lines: so.lines.map(l => ({ itemId: l.itemId, quantity: l.quantity }))
+      };
+
+      // Update SO status
+      this.updateSOStatus(so.id, 'Shipped', user);
+    } else {
+      // Called from DeliveryChallanForm: createDelivery(data, user)
+      const data = dataOrSoId;
+      user = userOrWarehouseId;
+      dc = {
+        ...data,
+        id: `DC-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
+        dcNumber: data.dcNumber || `DC-${Date.now().toString().slice(-5)}`,
+        status: 'Delivered',
+        date: data.date || new Date().toISOString(),
+        soId: data.soId || ''
+      };
+    }
+
+    // Process stock moves for the DC fulfillment
+    dc.lines.forEach(line => {
+      itemService.addStockMove({
+        itemId: line.itemId,
+        warehouseId: (dc as any).warehouseId || 'WH01',
+        refType: 'DELIVERY',
+        refNo: dc.dcNumber,
+        inQty: 0,
+        outQty: line.quantity,
+        note: `Fulfillment via ${dc.dcNumber}`
+      });
+    });
+
+    this.deliveryChallans.push(dc);
+    this.saveData();
+    if (user) auditService.log(user, 'SHIP', 'DELIVERY_CHALLAN', dc.id, `Created DC ${dc.dcNumber}`);
+    return dc;
+  }
+
+  createCreditNote(data: any, user: any) {
+    const cn: CreditNote = {
+      id: `CN-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
+      creditNoteNumber: data.creditNoteNumber || `CN-${Date.now().toString().slice(-5)}`,
+      customerId: data.customerId,
+      date: data.date || new Date().toISOString(),
+      amount: Number(data.amount),
+      status: 'Open',
+      reason: data.reason || 'General Return'
+    };
+    this.creditNotes.push(cn);
+    this.saveData();
+    if (user) auditService.log(user, 'CREATE', 'CREDIT_NOTE', cn.id, `Issued Credit Note ${cn.creditNoteNumber}`);
+    return cn;
+  }
 
   createSO(data: any, user: any) {
     const newSO: SalesOrder = {
@@ -117,6 +198,7 @@ class SalesService {
     };
     this.salesOrders.push(newSO);
     this.saveData();
+    if (user) auditService.log(user, 'CREATE', 'SALES_ORDER', newSO.id, `Created SO ${newSO.orderNumber}`);
     return newSO;
   }
 
@@ -125,70 +207,8 @@ class SalesService {
     if (idx !== -1) {
       this.salesOrders[idx].status = status as any;
       this.saveData();
-      auditService.log(user, 'UPDATE', 'SALES_ORDER', id, `Updated SO Status to ${status}`);
+      if (user) auditService.log(user, 'UPDATE', 'SALES_ORDER', id, `Status updated to ${status}`);
     }
-  }
-
-  createInvoiceFromSO(soId: string, user: any) {
-    const so = this.getSOById(soId);
-    if (!so) throw new Error("SO not found");
-    return this.createInvoice({
-      soId: so.id,
-      customerId: so.customerId,
-      total: so.total,
-      date: new Date().toISOString()
-    }, user);
-  }
-
-  createDelivery(soIdOrData: any, warehouseIdOrUser: any, userArg?: any) {
-    let dc: DeliveryChallan;
-    let activeUser = userArg;
-    let targetWarehouseId = 'WH01';
-
-    if (typeof soIdOrData === 'string') {
-      const so = this.getSOById(soIdOrData);
-      if (!so) throw new Error("SO not found");
-      dc = {
-        id: `DC-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
-        dcNumber: `DC-${Date.now().toString().slice(-5)}`,
-        soId: so.id,
-        customerId: so.customerId,
-        date: new Date().toISOString(),
-        status: 'Delivered',
-        lines: so.lines.map(l => ({ itemId: l.itemId, quantity: l.quantity }))
-      };
-      targetWarehouseId = warehouseIdOrUser;
-      activeUser = userArg;
-    } else {
-      const data = soIdOrData;
-      activeUser = warehouseIdOrUser;
-      dc = {
-        id: `DC-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
-        dcNumber: data.dcNumber || `DC-${Date.now().toString().slice(-5)}`,
-        soId: data.soId || '',
-        customerId: data.customerId,
-        date: data.date || new Date().toISOString(),
-        status: 'Delivered',
-        lines: data.lines
-      };
-    }
-
-    dc.lines.forEach((line: any) => {
-      itemService.addStockMove({
-        itemId: line.itemId,
-        warehouseId: targetWarehouseId,
-        refType: 'DELIVERY',
-        refNo: dc.dcNumber,
-        inQty: 0,
-        outQty: line.quantity,
-        note: `Manual Delivery ${dc.dcNumber}`
-      });
-    });
-
-    this.deliveryChallans.push(dc);
-    this.saveData();
-    if (activeUser) auditService.log(activeUser, 'CREATE', 'DELIVERY_CHALLAN', dc.id, `Created Delivery ${dc.dcNumber}`);
-    return dc;
   }
 
   createInvoice(data: any, user: any) {
@@ -201,11 +221,36 @@ class SalesService {
       dueDate: data.dueDate || new Date(Date.now() + 30 * 86400000).toISOString(),
       total: Number(data.total),
       balanceDue: Number(data.total),
-      status: 'Sent'
+      status: 'Sent',
+      // Production fix: ensure manual invoices have at least one valid line for PDF rendering
+      lines: data.lines?.length > 0 ? data.lines : [{
+        id: 'L1',
+        itemId: 'MANUAL',
+        itemName: 'General Sales / Professional Services',
+        quantity: 1,
+        rate: Number(data.total),
+        taxAmount: Number(data.total) * 0.05,
+        total: Number(data.total)
+      }]
     };
+
+    if (inv.lines.length > 0 && inv.lines[0].itemId !== 'MANUAL') {
+      inv.lines.forEach(line => {
+        itemService.addStockMove({
+          itemId: line.itemId,
+          warehouseId: 'WH01',
+          refType: 'SALES',
+          refNo: inv.invoiceNumber,
+          inQty: 0,
+          outQty: line.quantity,
+          note: `Inventory deduction via ${inv.invoiceNumber}`
+        });
+      });
+    }
+
     this.invoices.push(inv);
     this.saveData();
-    if (user) auditService.log(user, 'CREATE', 'INVOICE', inv.id, `Created Invoice ${inv.invoiceNumber}`);
+    if (user) auditService.log(user, 'CREATE', 'INVOICE', inv.id, `Invoiced ${inv.invoiceNumber}`);
     return inv;
   }
 
@@ -221,20 +266,18 @@ class SalesService {
       reference: data.reference || ''
     };
 
-    // Allocate to invoice if provided
     if (payment.invoiceId) {
       const invIdx = this.invoices.findIndex(i => i.id === payment.invoiceId);
       if (invIdx !== -1) {
-        const invoice = this.invoices[invIdx];
-        invoice.balanceDue = Math.max(0, invoice.balanceDue - payment.amount);
-        if (invoice.balanceDue <= 0) invoice.status = 'Paid';
-        else invoice.status = 'Partially Paid';
+        this.invoices[invIdx].balanceDue = Math.max(0, this.invoices[invIdx].balanceDue - payment.amount);
+        if (this.invoices[invIdx].balanceDue <= 0) this.invoices[invIdx].status = 'Paid';
+        else this.invoices[invIdx].status = 'Partially Paid';
       }
     }
 
     this.payments.push(payment);
     this.saveData();
-    if (user) auditService.log(user, 'CREATE', 'PAYMENT_RECEIVED', payment.id, `Recorded Payment ${payment.paymentNumber} of AED ${payment.amount}`);
+    if (user) auditService.log(user, 'CREATE', 'PAYMENT_RECEIVED', payment.id, `Received AED ${payment.amount}`);
     return payment;
   }
 }

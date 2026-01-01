@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, Plus, Trash2, Save, ShoppingCart, 
-  Package, Truck, ClipboardList
+  Package, Truck, ClipboardList, CheckCircle2, Clock
 } from 'lucide-react';
 import { useAuth } from '../../App';
 import { purchaseService } from '../../services/purchase.service';
@@ -53,18 +53,22 @@ export default function PurchaseOrderForm() {
 
   const total = lines.reduce((sum, l) => sum + l.total, 0);
 
-  const handleSubmit = (e?: React.FormEvent) => {
+  const handleSubmit = (e?: React.FormEvent, shouldIssue: boolean = false) => {
     if (e) e.preventDefault();
     if (!formData.vendorId || lines.some(l => !l.itemId)) {
       alert('Please select a vendor and at least one item.');
       return;
     }
 
-    purchaseService.createPO({
+    const newPO = purchaseService.createPO({
       ...formData,
       lines,
       total
     }, user);
+    
+    if (shouldIssue) {
+      purchaseService.updatePOStatus(newPO.id, 'Issued', user);
+    }
     
     navigate('/purchases/orders');
   };
@@ -73,7 +77,7 @@ export default function PurchaseOrderForm() {
     <div className="max-w-6xl mx-auto space-y-6 pb-20">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <button onClick={() => navigate('/purchases/orders')} className="p-2 hover:bg-slate-200 rounded-full transition-all text-slate-500">
+          <button onClick={() => navigate('/purchases/orders')} className="p-2 hover:bg-slate-200 rounded-full transition-all text-slate-500 bg-white border border-slate-200 shadow-sm">
             <ArrowLeft size={20} />
           </button>
           <div>
@@ -82,19 +86,29 @@ export default function PurchaseOrderForm() {
           </div>
         </div>
         <div className="flex gap-3">
-          <button onClick={() => navigate('/purchases/orders')} className="px-6 py-2 border border-slate-200 text-slate-700 rounded-xl font-bold text-sm bg-white !text-slate-900">Cancel</button>
+          <button onClick={() => navigate('/purchases/orders')} className="px-6 py-2 border border-slate-200 text-slate-700 rounded-xl font-bold text-sm bg-white hover:bg-slate-50 transition-all">Cancel</button>
+          
           <button 
-            type="submit"
-            form="po-form"
-            className="flex items-center gap-2 px-8 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-bold text-sm shadow-xl active:scale-95 transition-all"
+            type="button"
+            onClick={() => handleSubmit(undefined, false)}
+            className="flex items-center gap-2 px-6 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 font-bold text-sm shadow-sm transition-all active:scale-95"
           >
-            <Save size={18} />
-            Save Purchase Order
+            <Clock size={18} />
+            Save as Draft
+          </button>
+
+          <button 
+            type="button"
+            onClick={() => handleSubmit(undefined, true)}
+            className="flex items-center gap-2 px-8 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-bold text-sm shadow-xl shadow-blue-500/20 active:scale-95 transition-all"
+          >
+            <CheckCircle2 size={18} />
+            Save & Issue PO
           </button>
         </div>
       </div>
 
-      <form id="po-form" onSubmit={handleSubmit} className="space-y-8">
+      <form id="po-form" onSubmit={(e) => handleSubmit(e, false)} className="space-y-8">
         <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="space-y-1">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Vendor *</label>
@@ -102,7 +116,7 @@ export default function PurchaseOrderForm() {
               required
               value={formData.vendorId}
               onChange={e => setFormData({...formData, vendorId: e.target.value})}
-              className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none bg-white text-sm !bg-white !text-slate-900"
+              className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none bg-white text-sm !bg-white !text-slate-900 focus:ring-2 focus:ring-blue-100"
             >
               <option value="">Select a vendor...</option>
               {vendors.map(v => <option key={v.id} value={v.id}>{v.name} ({v.companyName})</option>)}
@@ -114,7 +128,7 @@ export default function PurchaseOrderForm() {
               type="date"
               value={formData.date}
               onChange={e => setFormData({...formData, date: e.target.value})}
-              className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none text-sm bg-white !bg-white !text-slate-900"
+              className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none text-sm bg-white !bg-white !text-slate-900 focus:ring-2 focus:ring-blue-100"
             />
           </div>
           <div className="space-y-1">
@@ -123,7 +137,7 @@ export default function PurchaseOrderForm() {
               type="date"
               value={formData.expectedDate}
               onChange={e => setFormData({...formData, expectedDate: e.target.value})}
-              className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none text-sm bg-white !bg-white !text-slate-900"
+              className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none text-sm bg-white !bg-white !text-slate-900 focus:ring-2 focus:ring-blue-100"
             />
           </div>
         </div>
@@ -182,10 +196,12 @@ export default function PurchaseOrderForm() {
                     />
                   </td>
                   <td className="px-6 py-4 text-right font-black text-slate-900">
-                    AED {line.total.toLocaleString()}
+                    AED {line.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </td>
                   <td className="px-6 py-4">
-                    <button type="button" onClick={() => handleRemoveItem(line.id)} className="text-slate-300 hover:text-red-500"><Trash2 size={16} /></button>
+                    <button type="button" onClick={() => handleRemoveItem(line.id)} className="text-slate-300 hover:text-red-500 transition-colors">
+                      <Trash2 size={16} />
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -193,9 +209,9 @@ export default function PurchaseOrderForm() {
           </table>
           <div className="p-8 bg-slate-50 flex justify-end">
              <div className="w-64 space-y-2">
-                <div className="flex justify-between text-lg font-black text-rose-600 border-t pt-2">
+                <div className="flex justify-between text-lg font-black text-rose-600 border-t border-rose-100 pt-2">
                    <span>Order Total</span>
-                   <span>AED {total.toLocaleString()}</span>
+                   <span>AED {total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                 </div>
              </div>
           </div>

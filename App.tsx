@@ -5,7 +5,8 @@ import {
   LayoutDashboard, Package, ShoppingCart, Truck, Users, 
   BarChart3, FileText, LogOut, Search, Bell, 
   ChevronDown, ChevronRight, Plus, Menu, X, 
-  Boxes, ShieldCheck, Settings as SettingsIcon, ClipboardList, Database, Activity
+  Boxes, ShieldCheck, Settings as SettingsIcon, ClipboardList, Database, Activity,
+  FileMinus
 } from 'lucide-react';
 import Dashboard from './views/Dashboard';
 import ItemsList from './views/ItemsList';
@@ -22,6 +23,8 @@ import SalesOrderForm from './views/sales/SalesOrderForm';
 import SalesOrderDetail from './views/sales/SalesOrderDetail';
 import Invoices from './views/sales/Invoices';
 import InvoiceForm from './views/sales/InvoiceForm';
+import CreditNotes from './views/sales/CreditNotes';
+import CreditNoteForm from './views/sales/CreditNoteForm';
 import DeliveryChallanList from './views/sales/DeliveryChallanList';
 import DeliveryChallanForm from './views/sales/DeliveryChallanForm';
 import PaymentReceivedList from './views/sales/PaymentReceivedList';
@@ -42,7 +45,6 @@ import Reports from './views/Reports';
 import Settings from './views/Settings';
 import Backup from './views/admin/Backup';
 import Health from './views/Health';
-import PlaceholderPage from './views/PlaceholderPage';
 import Login from './views/auth/Login';
 import Unauthorized from './views/errors/Unauthorized';
 import { User, Role, Permission } from './types';
@@ -63,19 +65,6 @@ export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) throw new Error("useAuth must be used within AuthProvider");
   return context;
-};
-
-// --- Protected Route Wrapper ---
-interface ProtectedRouteProps {
-  children: React.ReactNode;
-  permission?: Permission;
-}
-
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, permission }) => {
-  const { user, can } = useAuth();
-  if (!user) return <Navigate to="/login" replace />;
-  if (permission && !can(permission)) return <Navigate to="/unauthorized" replace />;
-  return <>{children}</>;
 };
 
 // --- Sidebar Configuration ---
@@ -101,6 +90,7 @@ const SIDEBAR_GROUPS = [
       { label: 'Sales Orders', path: '/sales/orders' },
       { label: 'Delivery Challans', path: '/sales/delivery-challans' },
       { label: 'Invoices', path: '/sales/invoices' },
+      { label: 'Credit Notes', path: '/sales/credit-notes' },
       { label: 'Payments Received', path: '/sales/payments' },
     ] 
   },
@@ -124,8 +114,8 @@ const SIDEBAR_GROUPS = [
     permission: 'admin.access',
     children: [
       { label: 'Settings', path: '/settings' },
-      { label: 'Health Check', icon: <Activity size={16} />, path: '/health' },
-      { label: 'Backup & Recovery', icon: <Database size={16} />, path: '/admin/backup' },
+      { label: 'Health Check', path: '/health' },
+      { label: 'Backup & Recovery', path: '/admin/backup' },
     ]
   },
 ];
@@ -149,7 +139,7 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ item, depth = 0 }) => {
     <div 
       className={`
         flex items-center justify-between px-4 py-2.5 mx-2 rounded-lg cursor-pointer transition-all duration-200
-        ${isActive ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}
+        ${isActive ? 'bg-[#f97316] text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}
         ${depth > 0 ? 'ml-8 text-sm py-2' : ''}
       `}
       onClick={() => hasChildren && setIsOpen(!isOpen)}
@@ -194,12 +184,7 @@ export default function App() {
 
   const login = async (email: string, pass: string) => {
     if (email === 'admin@klencare.com' && pass === 'Admin@1234') {
-      const newUser: User = { 
-        id: '1', 
-        name: 'Administrator', 
-        email: 'admin@klencare.com', 
-        role: Role.Admin 
-      };
+      const newUser: User = { id: '1', name: 'Administrator', email: 'admin@klencare.com', role: Role.Admin };
       setUser(newUser);
       localStorage.setItem('klencare_session', JSON.stringify(newUser));
       auditService.log(newUser, 'LOGIN', 'USER', newUser.id, 'Successful login');
@@ -228,21 +213,13 @@ export default function App() {
   return (
     <AuthContext.Provider value={{ user, login, logout, can }}>
       <div className="flex h-screen bg-slate-50">
-        <aside 
-          className={`
-            fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 transition-transform duration-300 transform 
-            ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-            lg:relative lg:translate-x-0 border-r border-slate-800
-          `}
-        >
+        <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 transition-transform duration-300 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 border-r border-slate-800`}>
           <div className="flex items-center justify-between h-16 px-6 border-b border-slate-800">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-white">K</div>
-              <span className="text-xl font-bold text-white tracking-tight">KlenCare <span className="text-blue-500">CRM</span></span>
+              <div className="w-8 h-8 bg-[#f97316] rounded-lg flex items-center justify-center font-bold text-white shadow-lg">K</div>
+              <span className="text-xl font-bold text-white tracking-tight">KlenCare <span className="text-[#2563eb]">CRM</span></span>
             </div>
-            <button className="lg:hidden text-slate-400" onClick={() => setSidebarOpen(false)}>
-              <X size={20} />
-            </button>
+            <button className="lg:hidden text-slate-400" onClick={() => setSidebarOpen(false)}><X size={20} /></button>
           </div>
 
           <nav className="mt-6 sidebar-scroll overflow-y-auto h-[calc(100vh-120px)] pb-20">
@@ -253,16 +230,14 @@ export default function App() {
 
           <div className="absolute bottom-0 w-full p-4 border-t border-slate-800 bg-slate-900">
             <div className="flex items-center gap-3 px-2 py-2">
-              <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-[10px] font-bold text-white">
+              <div className="w-8 h-8 rounded-full bg-[#2563eb] flex items-center justify-center text-[10px] font-bold text-white">
                 {user?.name.split(' ').map(n => n[0]).join('')}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-white truncate">{user?.name}</p>
-                <p className="text-[10px] text-blue-400 uppercase tracking-wider font-bold">{user?.role}</p>
+                <p className="text-[10px] text-[#f97316] uppercase tracking-wider font-bold">{user?.role}</p>
               </div>
-              <button onClick={logout} className="text-slate-400 hover:text-white transition-colors">
-                <LogOut size={18} />
-              </button>
+              <button onClick={logout} className="text-slate-400 hover:text-white transition-colors"><LogOut size={18} /></button>
             </div>
           </div>
         </aside>
@@ -270,92 +245,69 @@ export default function App() {
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 shrink-0 custom-shadow z-40">
             <div className="flex items-center gap-4">
-              <button className="lg:hidden text-slate-500" onClick={() => setSidebarOpen(true)}>
-                <Menu size={24} />
-              </button>
+              <button className="lg:hidden text-slate-500" onClick={() => setSidebarOpen(true)}><Menu size={24} /></button>
               <div className="relative group">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500" size={18} />
-                <input 
-                  type="text" 
-                  placeholder="Search across all modules..." 
-                  className="bg-slate-100 border-transparent focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-500 rounded-full py-2 pl-10 pr-4 w-64 lg:w-96 outline-none text-sm transition-all"
-                />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#2563eb]" size={18} />
+                <input type="text" placeholder="Search records..." className="bg-slate-100 border-transparent focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-[#2563eb] rounded-full py-2 pl-10 pr-4 w-64 lg:w-96 outline-none text-sm transition-all" />
               </div>
             </div>
 
             <div className="flex items-center gap-4">
-              <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-[10px] font-bold border border-blue-100">
-                <ShieldCheck size={14} />
-                {user?.role.toUpperCase()} ACCESS
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-blue-50 text-[#2563eb] rounded-full text-[10px] font-bold border border-blue-100">
+                <ShieldCheck size={14} /> {user?.role.toUpperCase()} ACCESS
               </div>
               <button className="p-2 text-slate-500 hover:bg-slate-100 rounded-full relative">
                 <Bell size={20} />
-                <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+                <span className="absolute top-2 right-2 w-2 h-2 bg-[#f97316] rounded-full border-2 border-white"></span>
               </button>
-              {can('items.create') && (
-                <button 
-                  onClick={() => navigate('/items/new')}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 active:scale-95"
-                >
-                  <Plus size={18} />
-                  <span className="text-sm font-bold hidden sm:inline">Quick Create</span>
-                </button>
-              )}
+              <button onClick={() => navigate('/items/new')} className="flex items-center gap-2 px-4 py-2 bg-[#f97316] text-white rounded-xl hover:bg-orange-700 transition-all shadow-lg active:scale-95">
+                <Plus size={18} /> <span className="text-sm font-bold hidden sm:inline">Quick Create</span>
+              </button>
             </div>
           </header>
 
           <main className="flex-1 overflow-y-auto p-6 bg-slate-50">
             <Routes>
-              <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-              <Route path="/items" element={<ProtectedRoute permission="items.view"><ItemsList /></ProtectedRoute>} />
-              <Route path="/items/new" element={<ProtectedRoute permission="items.create"><ItemForm /></ProtectedRoute>} />
-              <Route path="/items/edit/:id" element={<ProtectedRoute permission="items.edit"><ItemForm /></ProtectedRoute>} />
-              <Route path="/items/:id" element={<ProtectedRoute permission="items.view"><ItemDetail /></ProtectedRoute>} />
-              <Route path="/items/import" element={<ProtectedRoute permission="items.import"><ImportItems /></ProtectedRoute>} />
-              <Route path="/inventory/dashboard" element={<ProtectedRoute permission="inventory.view"><InventoryDashboard /></ProtectedRoute>} />
-              <Route path="/inventory/adjustments" element={<ProtectedRoute permission="inventory.manage"><Adjustments /></ProtectedRoute>} />
-              <Route path="/inventory/assemblies" element={<ProtectedRoute permission="inventory.manage"><Assemblies /></ProtectedRoute>} />
-              
-              <Route path="/sales/customers" element={<ProtectedRoute permission="sales.view"><Customers /></ProtectedRoute>} />
-              <Route path="/sales/customers/new" element={<ProtectedRoute permission="sales.create"><CustomerForm /></ProtectedRoute>} />
-              <Route path="/sales/customers/edit/:id" element={<ProtectedRoute permission="sales.edit"><CustomerForm /></ProtectedRoute>} />
-              
-              <Route path="/sales/orders" element={<ProtectedRoute permission="sales.view"><SalesOrders /></ProtectedRoute>} />
-              <Route path="/sales/orders/new" element={<ProtectedRoute permission="sales.create"><SalesOrderForm /></ProtectedRoute>} />
-              <Route path="/sales/orders/:id" element={<ProtectedRoute permission="sales.view"><SalesOrderDetail /></ProtectedRoute>} />
-              
-              <Route path="/sales/delivery-challans" element={<ProtectedRoute permission="sales.view"><DeliveryChallanList /></ProtectedRoute>} />
-              <Route path="/sales/delivery-challans/new" element={<ProtectedRoute permission="sales.create"><DeliveryChallanForm /></ProtectedRoute>} />
-              
-              <Route path="/sales/invoices" element={<ProtectedRoute permission="sales.view"><Invoices /></ProtectedRoute>} />
-              <Route path="/sales/invoices/new" element={<ProtectedRoute permission="sales.create"><InvoiceForm /></ProtectedRoute>} />
-              
-              <Route path="/sales/payments" element={<ProtectedRoute permission="sales.view"><PaymentReceivedList /></ProtectedRoute>} />
-              <Route path="/sales/payments/new" element={<ProtectedRoute permission="sales.create"><PaymentReceivedForm /></ProtectedRoute>} />
-              
-              <Route path="/purchases/vendors" element={<ProtectedRoute permission="purchases.view"><Vendors /></ProtectedRoute>} />
-              <Route path="/purchases/vendors/new" element={<ProtectedRoute permission="purchases.create"><VendorForm /></ProtectedRoute>} />
-              <Route path="/purchases/vendors/edit/:id" element={<ProtectedRoute permission="purchases.edit"><VendorForm /></ProtectedRoute>} />
-              
-              <Route path="/purchases/orders" element={<ProtectedRoute permission="purchases.view"><PurchaseOrders /></ProtectedRoute>} />
-              <Route path="/purchases/orders/new" element={<ProtectedRoute permission="purchases.create"><PurchaseOrderForm /></ProtectedRoute>} />
-              <Route path="/purchases/orders/:id" element={<ProtectedRoute permission="purchases.view"><PurchaseOrderDetail /></ProtectedRoute>} />
-              
-              <Route path="/purchases/receives" element={<ProtectedRoute permission="purchases.view"><GoodsReceiveList /></ProtectedRoute>} />
-              <Route path="/purchases/receives/new" element={<ProtectedRoute permission="purchases.create"><GoodsReceiveForm /></ProtectedRoute>} />
-              
-              <Route path="/purchases/bills" element={<ProtectedRoute permission="purchases.view"><Bills /></ProtectedRoute>} />
-              <Route path="/purchases/bills/new" element={<ProtectedRoute permission="purchases.create"><BillForm /></ProtectedRoute>} />
-              
-              <Route path="/purchases/payments" element={<ProtectedRoute permission="purchases.view"><PaymentMadeList /></ProtectedRoute>} />
-              <Route path="/purchases/payments/new" element={<ProtectedRoute permission="purchases.create"><PaymentMadeForm /></ProtectedRoute>} />
-
-              <Route path="/documents" element={<ProtectedRoute permission="documents.view"><Documents /></ProtectedRoute>} />
-              <Route path="/reports" element={<ProtectedRoute permission="reports.view"><Reports /></ProtectedRoute>} />
-              <Route path="/settings" element={<ProtectedRoute permission="admin.access"><Settings /></ProtectedRoute>} />
-              <Route path="/admin/backup" element={<ProtectedRoute permission="admin.access"><Backup /></ProtectedRoute>} />
-              <Route path="/health" element={<ProtectedRoute><Health /></ProtectedRoute>} />
-
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/items" element={<ItemsList />} />
+              <Route path="/items/new" element={<ItemForm />} />
+              <Route path="/items/edit/:id" element={<ItemForm />} />
+              <Route path="/items/:id" element={<ItemDetail />} />
+              <Route path="/items/import" element={<ImportItems />} />
+              <Route path="/inventory/dashboard" element={<InventoryDashboard />} />
+              <Route path="/inventory/adjustments" element={<Adjustments />} />
+              <Route path="/inventory/assemblies" element={<Assemblies />} />
+              <Route path="/sales/customers" element={<Customers />} />
+              <Route path="/sales/customers/new" element={<CustomerForm />} />
+              <Route path="/sales/customers/edit/:id" element={<CustomerForm />} />
+              <Route path="/sales/orders" element={<SalesOrders />} />
+              <Route path="/sales/orders/new" element={<SalesOrderForm />} />
+              <Route path="/sales/orders/:id" element={<SalesOrderDetail />} />
+              <Route path="/sales/invoices" element={<Invoices />} />
+              <Route path="/sales/invoices/new" element={<InvoiceForm />} />
+              <Route path="/sales/credit-notes" element={<CreditNotes />} />
+              <Route path="/sales/credit-notes/new" element={<CreditNoteForm />} />
+              <Route path="/sales/delivery-challans" element={<DeliveryChallanList />} />
+              <Route path="/sales/delivery-challans/new" element={<DeliveryChallanForm />} />
+              <Route path="/sales/payments" element={<PaymentReceivedList />} />
+              <Route path="/sales/payments/new" element={<PaymentReceivedForm />} />
+              <Route path="/purchases/vendors" element={<Vendors />} />
+              <Route path="/purchases/vendors/new" element={<VendorForm />} />
+              <Route path="/purchases/vendors/edit/:id" element={<VendorForm />} />
+              <Route path="/purchases/orders" element={<PurchaseOrders />} />
+              <Route path="/purchases/orders/new" element={<PurchaseOrderForm />} />
+              <Route path="/purchases/orders/:id" element={<PurchaseOrderDetail />} />
+              <Route path="/purchases/receives" element={<GoodsReceiveList />} />
+              <Route path="/purchases/receives/new" element={<GoodsReceiveForm />} />
+              <Route path="/purchases/bills" element={<Bills />} />
+              <Route path="/purchases/bills/new" element={<BillForm />} />
+              <Route path="/purchases/payments" element={<PaymentMadeList />} />
+              <Route path="/purchases/payments/new" element={<PaymentMadeForm />} />
+              <Route path="/documents" element={<Documents />} />
+              <Route path="/reports" element={<Reports />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/admin/backup" element={<Backup />} />
+              <Route path="/health" element={<Health />} />
               <Route path="/unauthorized" element={<Unauthorized />} />
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>

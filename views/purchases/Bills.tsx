@@ -1,11 +1,12 @@
 
 import React, { useState } from 'react';
 import { 
-  FileText, Search, Filter, 
+  FileText, Search, Filter, Plus,
   Calendar, ArrowRight, Clock, Truck, Wallet, FileDown
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { purchaseService } from '../../services/purchase.service';
+import { useAuth } from '../../App';
 
 const BillStatusBadge = ({ status }: { status: string }) => {
   const styles: any = {
@@ -24,8 +25,15 @@ const BillStatusBadge = ({ status }: { status: string }) => {
 
 export default function Bills() {
   const navigate = useNavigate();
+  const { can } = useAuth();
   const [search, setSearch] = useState('');
   const bills = purchaseService.getBills().reverse();
+
+  const filteredBills = bills.filter(bill => {
+    const vendor = purchaseService.getVendorById(bill.vendorId);
+    return bill.billNumber.toLowerCase().includes(search.toLowerCase()) || 
+           vendor?.name.toLowerCase().includes(search.toLowerCase());
+  });
 
   return (
     <div className="space-y-6">
@@ -34,6 +42,15 @@ export default function Bills() {
           <h1 className="text-2xl font-bold text-slate-900">Vendor Bills</h1>
           <p className="text-slate-500 text-sm">Manage payables and track vendor invoicing.</p>
         </div>
+        {can('purchases.create') && (
+          <button 
+            onClick={() => navigate('/purchases/bills/new')}
+            className="flex items-center gap-2 px-6 py-2.5 bg-rose-600 text-white rounded-xl hover:bg-rose-700 font-bold text-sm shadow-xl shadow-rose-500/20 active:scale-95 transition-all"
+          >
+            <Plus size={18} />
+            Record New Bill
+          </button>
+        )}
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -45,10 +62,10 @@ export default function Bills() {
               placeholder="Search by bill number or vendor..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 pr-4 py-2 border border-slate-200 rounded-xl w-full outline-none text-sm bg-white !text-slate-900"
+              className="pl-9 pr-4 py-2 border border-slate-200 rounded-xl w-full outline-none text-sm bg-white !text-slate-900 focus:ring-2 focus:ring-blue-100"
             />
           </div>
-          <button className="flex items-center gap-2 px-3 py-1.5 text-slate-600 border border-slate-200 rounded-lg text-xs font-bold bg-white">
+          <button className="flex items-center gap-2 px-3 py-1.5 text-slate-600 border border-slate-200 rounded-lg text-xs font-bold bg-white hover:bg-slate-50 transition-all">
             <Filter size={14} /> Filter Status
           </button>
         </div>
@@ -67,11 +84,11 @@ export default function Bills() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {bills.length > 0 ? bills.map(bill => {
+              {filteredBills.length > 0 ? filteredBills.map(bill => {
                 const vendor = purchaseService.getVendorById(bill.vendorId);
                 const isOverdue = new Date(bill.dueDate) < new Date() && bill.balanceDue > 0;
                 return (
-                  <tr key={bill.id} className="hover:bg-slate-50/50 transition-colors group">
+                  <tr key={bill.id} className="hover:bg-slate-50/50 transition-colors group cursor-pointer">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-rose-50 text-rose-600 rounded-lg flex items-center justify-center font-bold text-xs">BIL</div>
@@ -90,10 +107,10 @@ export default function Bills() {
                         {new Date(bill.dueDate).toLocaleDateString()}
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-right font-bold text-slate-700">AED {bill.total.toLocaleString()}</td>
+                    <td className="px-6 py-4 text-right font-bold text-slate-700">AED {bill.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                     <td className="px-6 py-4 text-right">
                       <p className={`text-sm font-black ${bill.balanceDue > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                        AED {bill.balanceDue.toLocaleString()}
+                        AED {bill.balanceDue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </p>
                     </td>
                     <td className="px-6 py-4">
@@ -101,17 +118,32 @@ export default function Bills() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button className="p-2 text-slate-400 hover:text-slate-900"><ArrowRight size={18} /></button>
+                        <button className="p-2 text-slate-400 hover:text-slate-900 transition-all"><ArrowRight size={18} /></button>
                       </div>
                     </td>
                   </tr>
                 );
               }) : (
                 <tr>
-                  <td colSpan={7} className="px-6 py-20 text-center">
-                    <div className="flex flex-col items-center gap-2 text-slate-400">
-                      <FileText size={40} className="opacity-20" />
-                      <p className="text-sm italic">No vendor bills found.</p>
+                  <td colSpan={7} className="px-6 py-24 text-center">
+                    <div className="flex flex-col items-center gap-4 text-slate-300 max-w-sm mx-auto">
+                      <div className="w-20 h-20 bg-slate-50 rounded-3xl flex items-center justify-center border border-slate-100 shadow-inner">
+                        <FileText size={40} className="opacity-20" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-slate-900">No vendor bills recorded</p>
+                        <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                          Vendor bills track your accounts payable. You can record a bill manually or convert a received Purchase Order into a bill.
+                        </p>
+                      </div>
+                      {can('purchases.create') && (
+                        <button 
+                          onClick={() => navigate('/purchases/bills/new')}
+                          className="mt-2 px-6 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm"
+                        >
+                          Record First Bill
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

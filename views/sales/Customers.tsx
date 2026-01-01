@@ -3,10 +3,11 @@ import React, { useState } from 'react';
 import { 
   Users, Search, Filter, Plus, Mail, Phone, 
   Edit2, Trash2, Wallet, History, FileText,
-  ChevronRight
+  ChevronRight, FileSpreadsheet
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { salesService } from '../../services/sales.service';
+import { pdfService } from '../../services/pdf.service';
 import { useAuth } from '../../App';
 
 export default function Customers() {
@@ -30,6 +31,11 @@ export default function Customers() {
     } catch (err: any) {
       alert(err.message);
     }
+  };
+
+  const handleDownloadStatement = (e: React.MouseEvent, cust: any) => {
+    e.stopPropagation();
+    pdfService.generateStatement(cust, user);
   };
 
   return (
@@ -119,14 +125,23 @@ export default function Customers() {
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button 
+                          onClick={(e) => handleDownloadStatement(e, cust)}
+                          className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                          title="Download Statement"
+                        >
+                          <FileText size={16} />
+                        </button>
+                        <button 
                           onClick={() => navigate(`/sales/customers/edit/${cust.id}`)}
                           className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                          title="Edit"
                         >
                           <Edit2 size={16} />
                         </button>
                         <button 
                           onClick={() => handleDelete(cust.id, cust.name)}
                           className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                          title="Delete"
                         >
                           <Trash2 size={16} />
                         </button>

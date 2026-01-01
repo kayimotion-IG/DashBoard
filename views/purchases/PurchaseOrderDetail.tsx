@@ -4,9 +4,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, ClipboardList, Truck, Receipt, 
   CheckCircle2, Clock, Calendar, PackageCheck, FileDown, 
-  User as UserIcon, Building2, AlertCircle
+  User as UserIcon, Building2, AlertCircle, ArrowRight
 } from 'lucide-react';
 import { purchaseService } from '../../services/purchase.service';
+import { pdfService } from '../../services/pdf.service';
 import { useAuth } from '../../App';
 import { PurchaseOrder, Vendor } from '../../types';
 
@@ -29,6 +30,12 @@ export default function PurchaseOrderDetail() {
   }, [id]);
 
   if (!po) return <div className="p-20 text-center font-bold text-slate-400 italic">Purchase Order not found...</div>;
+
+  const handleExportPDF = () => {
+    if (po && vendor) {
+      pdfService.generatePurchaseOrder(po, vendor, user);
+    }
+  };
 
   const handleIssue = () => {
     purchaseService.updatePOStatus(po.id, 'Issued', user);
@@ -61,11 +68,10 @@ export default function PurchaseOrderDetail() {
       ].map((step, idx) => {
         const statuses = ['Draft', 'Issued', 'Received', 'Billed', 'Cancelled'];
         const isPast = statuses.indexOf(po.status) >= idx;
-        const isCurrent = po.status === step.status;
         return (
           <React.Fragment key={step.status}>
             <div className={`flex flex-col items-center gap-2 ${isPast ? 'text-rose-600' : 'text-slate-300'}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${isPast ? 'border-rose-600 bg-white' : 'border-slate-200'}`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${isPast ? 'border-rose-600 bg-white shadow-sm' : 'border-slate-200'}`}>
                 {step.icon}
               </div>
               <span className="text-[10px] font-black uppercase tracking-tighter">{step.label}</span>
@@ -93,10 +99,15 @@ export default function PurchaseOrderDetail() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <button onClick={handleExportPDF} className="p-2.5 text-slate-700 bg-white border border-slate-200 rounded-xl transition-all flex items-center gap-2 text-sm font-bold shadow-sm hover:bg-slate-50">
+            <FileDown size={18} />
+            Export PDF
+          </button>
+          
           {po.status === 'Draft' && can('purchases.create') && (
             <button 
               onClick={handleIssue}
-              className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-bold text-sm shadow-xl active:scale-95 transition-all"
+              className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-bold text-sm shadow-xl shadow-blue-500/20 active:scale-95 transition-all"
             >
               <CheckCircle2 size={18} />
               Issue PO
@@ -125,6 +136,27 @@ export default function PurchaseOrderDetail() {
         </div>
       </div>
 
+      {po.status === 'Draft' && (
+        <div className="p-6 bg-amber-50 border border-amber-200 rounded-[32px] flex items-start gap-4 animate-in slide-in-from-top-4">
+          <div className="p-3 bg-white rounded-2xl shadow-sm text-amber-600">
+            <AlertCircle size={24} />
+          </div>
+          <div className="flex-1">
+            <h4 className="text-sm font-black text-amber-900 uppercase tracking-widest mb-1">Status: Internal Draft</h4>
+            <p className="text-xs text-amber-700 leading-relaxed font-medium">
+              This Purchase Order is currently a draft. It has not been authorized or issued to the vendor. 
+              Review the costs and items below, then click <b>"Issue PO"</b> to finalize the procurement request.
+            </p>
+          </div>
+          <button 
+            onClick={handleIssue}
+            className="flex items-center gap-2 px-6 py-3 bg-amber-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-amber-200 hover:bg-amber-700 transition-all active:scale-95"
+          >
+            Issue Now <ArrowRight size={16} />
+          </button>
+        </div>
+      )}
+
       <StatusStepper />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -151,7 +183,7 @@ export default function PurchaseOrderDetail() {
                     </td>
                     <td className="px-6 py-5 text-center font-black text-slate-700">{line.quantity}</td>
                     <td className="px-6 py-5 text-right text-slate-500">AED {line.rate.toFixed(2)}</td>
-                    <td className="px-8 py-5 text-right font-black text-slate-900">AED {line.total.toLocaleString()}</td>
+                    <td className="px-8 py-5 text-right font-black text-slate-900">AED {line.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                   </tr>
                 ))}
               </tbody>
@@ -161,7 +193,7 @@ export default function PurchaseOrderDetail() {
               <div className="w-72">
                 <div className="pt-3 flex justify-between items-center">
                   <span className="text-sm font-black text-slate-900 uppercase tracking-widest">Grand Total</span>
-                  <span className="text-2xl font-black text-rose-600">AED {po.total.toLocaleString()}</span>
+                  <span className="text-2xl font-black text-rose-600">AED {po.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                 </div>
               </div>
             </div>

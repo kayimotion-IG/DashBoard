@@ -1,13 +1,13 @@
 
 import { Vendor, PurchaseOrder, Bill, PaymentMade, GoodsReceive } from '../types';
-import { itemService } from './item.service';
 import { auditService } from './audit.service';
+import { itemService } from './item.service';
 
 class PurchaseService {
   private vendors: Vendor[] = [];
-  private purchaseOrders: PurchaseOrder[] = [];
+  private pos: PurchaseOrder[] = [];
   private bills: Bill[] = [];
-  private paymentsMade: PaymentMade[] = [];
+  private payments: PaymentMade[] = [];
   private receives: GoodsReceive[] = [];
 
   constructor() {
@@ -15,18 +15,20 @@ class PurchaseService {
   }
 
   private loadData() {
-    const data = [
-      { key: 'klencare_vendors', ref: 'vendors' },
-      { key: 'klencare_pos', ref: 'purchaseOrders' },
-      { key: 'klencare_bills', ref: 'bills' },
-      { key: 'klencare_payments_made', ref: 'paymentsMade' },
-      { key: 'klencare_receives', ref: 'receives' },
-    ];
+    const vendors = localStorage.getItem('klencare_vendors');
+    if (vendors) this.vendors = JSON.parse(vendors);
 
-    data.forEach(d => {
-      const stored = localStorage.getItem(d.key);
-      if (stored) (this as any)[d.ref] = JSON.parse(stored);
-    });
+    const pos = localStorage.getItem('klencare_pos');
+    if (pos) this.pos = JSON.parse(pos);
+
+    const bills = localStorage.getItem('klencare_bills');
+    if (bills) this.bills = JSON.parse(bills);
+
+    const payments = localStorage.getItem('klencare_payments_made');
+    if (payments) this.payments = JSON.parse(payments);
+
+    const receives = localStorage.getItem('klencare_receives');
+    if (receives) this.receives = JSON.parse(receives);
 
     if (this.vendors.length === 0) {
       this.seedData();
@@ -35,16 +37,46 @@ class PurchaseService {
 
   private seedData() {
     this.vendors = [
-      { id: 'VND-01', name: 'Primary Gulf Supplier', companyName: 'Middle East Logistics LLC', email: 'supply@me-logistics.ae', phone: '+971 6 555 1111', currency: 'AED', address: 'SAIF Zone, Sharjah, UAE', status: 'Active', createdAt: new Date().toISOString() }
+      { 
+        id: 'VND-01', 
+        name: 'Elite Supplies', 
+        companyName: 'Elite General Trading LLC', 
+        email: 'orders@elite.ae', 
+        phone: '+971 4 111 2222', 
+        mobile: '+971 50 999 8888',
+        website: 'https://elite-supplies.ae',
+        currency: 'AED', 
+        trn: '100012345600003',
+        address: 'Warehouse 12, Jebel Ali Freezone, Dubai', 
+        billingAddress: 'Warehouse 12, Jebel Ali Freezone, Dubai',
+        shippingAddress: 'Warehouse 12, Jebel Ali Freezone, Dubai',
+        status: 'Active', 
+        createdAt: new Date().toISOString() 
+      }
     ];
+
+    // Seed a sample bill
+    this.bills = [
+      {
+        id: 'BIL-SEED-01',
+        billNumber: 'BIL-2024-001',
+        vendorId: 'VND-01',
+        date: new Date().toISOString(),
+        dueDate: new Date(Date.now() + 15 * 86400000).toISOString(),
+        total: 1250.00,
+        balanceDue: 1250.00,
+        status: 'Open'
+      }
+    ];
+
     this.saveData();
   }
 
   private saveData() {
     localStorage.setItem('klencare_vendors', JSON.stringify(this.vendors));
-    localStorage.setItem('klencare_pos', JSON.stringify(this.purchaseOrders));
+    localStorage.setItem('klencare_pos', JSON.stringify(this.pos));
     localStorage.setItem('klencare_bills', JSON.stringify(this.bills));
-    localStorage.setItem('klencare_payments_made', JSON.stringify(this.paymentsMade));
+    localStorage.setItem('klencare_payments_made', JSON.stringify(this.payments));
     localStorage.setItem('klencare_receives', JSON.stringify(this.receives));
   }
 
@@ -52,32 +84,33 @@ class PurchaseService {
     let filtered = [...this.vendors];
     if (filters.search) {
       const s = filters.search.toLowerCase();
-      filtered = filtered.filter(v => 
-        v.name.toLowerCase().includes(s) || 
-        v.companyName.toLowerCase().includes(s)
-      );
+      filtered = filtered.filter(v => v.name.toLowerCase().includes(s) || v.companyName.toLowerCase().includes(s) || (v.trn && v.trn.includes(s)));
     }
     return filtered;
   }
-  
-  getVendorById(id: string) { return this.vendors.find(v => v.id === id); }
+
+  getVendorById(id: string) {
+    return this.vendors.find(v => v.id === id);
+  }
+
+  findOrCreateVendor(name: string, user: any) {
+    let vendor = this.vendors.find(v => v.name === name);
+    if (!vendor) {
+      vendor = this.createVendor({ name, companyName: name, email: '', phone: '', currency: 'AED', address: '', status: 'Active' }, user);
+    }
+    return vendor;
+  }
 
   createVendor(data: any, user: any) {
-    const newVnd: Vendor = {
+    const newV: Vendor = {
+      ...data,
       id: `VND-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
-      name: data.name.trim(),
-      companyName: data.companyName || '',
-      email: data.email || '',
-      phone: data.phone || '',
-      currency: data.currency || 'AED',
-      address: data.address || '',
-      status: 'Active',
       createdAt: new Date().toISOString()
     };
-    this.vendors.push(newVnd);
+    this.vendors.push(newV);
     this.saveData();
-    if (user) auditService.log(user, 'CREATE', 'VENDOR', newVnd.id, `Created Vendor ${newVnd.name}`);
-    return newVnd;
+    if (user) auditService.log(user, 'CREATE', 'VENDOR', newV.id, `Created vendor ${newV.name}`);
+    return newV;
   }
 
   updateVendor(id: string, data: any, user: any) {
@@ -85,69 +118,27 @@ class PurchaseService {
     if (idx !== -1) {
       this.vendors[idx] = { ...this.vendors[idx], ...data };
       this.saveData();
+      if (user) auditService.log(user, 'UPDATE', 'VENDOR', id, `Updated vendor ${this.vendors[idx].name}`);
+      return this.vendors[idx];
     }
+    return null;
   }
 
   deleteVendor(id: string, user: any) {
+    const v = this.getVendorById(id);
     this.vendors = this.vendors.filter(v => v.id !== id);
     this.saveData();
+    if (v && user) auditService.log(user, 'DELETE', 'VENDOR', id, `Deleted vendor ${v.name}`);
   }
 
   getVendorBalance(vendorId: string) {
     return this.bills
       .filter(b => b.vendorId === vendorId && b.status !== 'Void')
-      .reduce((s, b) => s + (Number(b.balanceDue) || 0), 0);
+      .reduce((sum, b) => sum + (Number(b.balanceDue) || 0), 0);
   }
 
-  getPurchaseOrders() { return this.purchaseOrders; }
-  getPOById(id: string) { return this.purchaseOrders.find(po => po.id === id); }
-  
-  updatePOStatus(id: string, status: string, user: any) {
-    const idx = this.purchaseOrders.findIndex(po => po.id === id);
-    if (idx !== -1) {
-      this.purchaseOrders[idx].status = status as any;
-      this.saveData();
-      auditService.log(user, 'UPDATE', 'PURCHASE_ORDER', id, `Updated PO Status to ${status}`);
-    }
-  }
-
-  receivePO(poId: string, warehouseId: string, user: any) {
-    const po = this.getPOById(poId);
-    if (!po) throw new Error("PO not found");
-    return this.createGRN({
-      vendorId: po.vendorId,
-      warehouseId,
-      total: po.total,
-      lines: po.lines.map(l => ({
-        itemId: l.itemId,
-        quantity: l.quantity,
-        unitCost: l.rate,
-        total: l.total
-      }))
-    }, user);
-  }
-
-  createBillFromPO(poId: string, user: any) {
-    const po = this.getPOById(poId);
-    if (!po) throw new Error("PO not found");
-    return this.createBill({
-      poId: po.id,
-      vendorId: po.vendorId,
-      total: po.total,
-      date: new Date().toISOString()
-    }, user);
-  }
-
-  findOrCreateVendor(name: string, user: any): Vendor {
-    const found = this.vendors.find(v => v.name.toLowerCase() === name.toLowerCase().trim());
-    if (found) return found;
-    return this.createVendor({ name: name.trim() }, user);
-  }
-
-  getBills() { return this.bills; }
-  getBillById(id: string) { return this.bills.find(b => b.id === id); }
-  getReceives() { return this.receives; }
-  getPaymentsMade() { return this.paymentsMade; }
+  getPurchaseOrders() { return this.pos; }
+  getPOById(id: string) { return this.pos.find(po => po.id === id); }
 
   createPO(data: any, user: any) {
     const newPO: PurchaseOrder = {
@@ -157,85 +148,115 @@ class PurchaseService {
       status: 'Draft',
       date: data.date || new Date().toISOString()
     };
-    this.purchaseOrders.push(newPO);
+    this.pos.push(newPO);
     this.saveData();
     return newPO;
   }
 
+  updatePOStatus(id: string, status: string, user: any) {
+    const idx = this.pos.findIndex(p => p.id === id);
+    if (idx !== -1) {
+      this.pos[idx].status = status as any;
+      this.saveData();
+      if (user) auditService.log(user, 'UPDATE', 'PURCHASE_ORDER', id, `Updated PO status to ${status}`);
+    }
+  }
+
+  getReceives() { return this.receives; }
+
   createGRN(data: any, user: any) {
     const grn: GoodsReceive = {
+      ...data,
       id: `GRN-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
       receiveNo: data.receiveNo || `GRN-${Date.now().toString().slice(-5)}`,
-      vendorId: data.vendorId,
-      warehouseId: data.warehouseId || 'WH01',
-      date: data.date || new Date().toISOString(),
-      total: data.total,
       status: 'Received',
-      lines: data.lines
+      date: data.date || new Date().toISOString()
     };
 
     grn.lines.forEach((line: any) => {
       itemService.addStockMove({
         itemId: line.itemId,
-        warehouseId: grn.warehouseId,
+        warehouseId: data.warehouseId || 'WH01',
         refType: 'GRN',
         refNo: grn.receiveNo,
-        inQty: line.quantity,
+        inQty: Number(line.quantity),
         outQty: 0,
-        note: `Manual Receipt ${grn.receiveNo}`
+        note: `Goods Receipt: ${grn.receiveNo}`
       });
     });
 
     this.receives.push(grn);
     this.saveData();
-    if (user) auditService.log(user, 'CREATE', 'GRN', grn.id, `Created GRN ${grn.receiveNo}`);
+    if (user) auditService.log(user, 'RECEIVE', 'GOODS_RECEIVE', grn.id, `Posted GRN ${grn.receiveNo}`);
     return grn;
   }
 
+  receivePO(poId: string, warehouseId: string, user: any) {
+    const po = this.getPOById(poId);
+    if (!po) throw new Error("PO not found");
+    
+    const grn = this.createGRN({
+      vendorId: po.vendorId,
+      warehouseId,
+      total: po.total,
+      lines: po.lines.map(l => ({ ...l, unitCost: l.rate })),
+      notes: `Received from ${po.poNumber}`
+    }, user);
+    
+    this.updatePOStatus(poId, 'Received', user);
+    return grn;
+  }
+
+  getBills() { return this.bills; }
+
   createBill(data: any, user: any) {
     const bill: Bill = {
+      ...data,
       id: `BIL-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
       billNumber: data.billNumber || `BIL-${Date.now().toString().slice(-5)}`,
-      poId: data.poId || '',
-      vendorId: data.vendorId,
-      date: data.date || new Date().toISOString(),
-      dueDate: data.dueDate || new Date(Date.now() + 30 * 86400000).toISOString(),
-      total: Number(data.total),
-      balanceDue: Number(data.total),
-      status: 'Open'
+      status: 'Open',
+      balanceDue: Number(data.total)
     };
     this.bills.push(bill);
     this.saveData();
-    if (user) auditService.log(user, 'CREATE', 'VENDOR_BILL', bill.id, `Recorded Bill ${bill.billNumber}`);
+    if (user) auditService.log(user, 'CREATE', 'BILL', bill.id, `Created Bill ${bill.billNumber}`);
     return bill;
   }
 
+  createBillFromPO(poId: string, user: any) {
+    const po = this.getPOById(poId);
+    if (!po) throw new Error("PO not found");
+    return this.createBill({
+      poId: po.id,
+      vendorId: po.vendorId,
+      total: po.total,
+      date: new Date().toISOString(),
+      dueDate: new Date(Date.now() + 30 * 86400000).toISOString()
+    }, user);
+  }
+
+  getPaymentsMade() { return this.payments; }
+
   recordPayment(data: any, user: any) {
     const payment: PaymentMade = {
-      id: `PAY-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
-      paymentNumber: data.paymentNumber || `PAY-${Date.now().toString().slice(-5)}`,
-      vendorId: data.vendorId,
-      billId: data.billId || '',
-      date: data.date || new Date().toISOString(),
-      amount: Number(data.amount),
-      paymentMode: data.paymentMode || 'Bank',
-      reference: data.reference || ''
+      ...data,
+      id: `PMT-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
+      paymentNumber: data.paymentNumber || `PMT-${Date.now().toString().slice(-5)}`,
+      date: data.date || new Date().toISOString()
     };
 
-    // Allocate to bill if provided
     if (payment.billId) {
-      const billIdx = this.bills.findIndex(b => b.id === payment.billId);
-      if (billIdx !== -1) {
-        const bill = this.bills[billIdx];
-        bill.balanceDue = Math.max(0, bill.balanceDue - payment.amount);
-        if (bill.balanceDue <= 0) bill.status = 'Paid';
-        else bill.status = 'Partially Paid';
+      const idx = this.bills.findIndex(b => b.id === payment.billId);
+      if (idx !== -1) {
+        this.bills[idx].balanceDue = Math.max(0, this.bills[idx].balanceDue - Number(payment.amount));
+        if (this.bills[idx].balanceDue <= 0) this.bills[idx].status = 'Paid';
+        else this.bills[idx].status = 'Partially Paid';
       }
     }
 
-    this.paymentsMade.push(payment);
+    this.payments.push(payment);
     this.saveData();
-    if (user) auditService.log(user, 'CREATE', 'PAYMENT_MADE', payment.id, `Paid AED ${payment.amount} to vendor`);
+    if (user) auditService.log(user, 'CREATE', 'PAYMENT_MADE', payment.id, `Recorded payment ${payment.paymentNumber} of AED ${payment.amount}`);
     return payment;
   }
 }

@@ -100,9 +100,15 @@ export interface Vendor {
   companyName: string;
   email: string;
   phone: string;
+  mobile?: string;
+  website?: string;
   currency: string;
-  address: string;
+  trn?: string;
+  address: string; // General address (Legacy support)
+  billingAddress?: string;
+  shippingAddress?: string;
   status: 'Active' | 'Inactive';
+  notes?: string;
   createdAt: string;
 }
 
@@ -122,6 +128,7 @@ export interface SalesOrderLine {
 export interface SalesOrder {
   id: string;
   orderNumber: string;
+  lpoNumber?: string;
   customerId: string;
   date: string;
   shipmentDate?: string;
@@ -246,6 +253,7 @@ export interface PaymentMade {
 export interface Invoice {
   id: string;
   invoiceNumber: string;
+  lpoNumber?: string;
   soId?: string;
   customerId: string;
   date: string;
@@ -253,6 +261,7 @@ export interface Invoice {
   total: number;
   balanceDue: number;
   status: 'Sent' | 'Partially Paid' | 'Paid' | 'Voided';
+  lines?: SalesOrderLine[];
 }
 
 export interface CreditNote {
