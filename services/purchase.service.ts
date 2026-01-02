@@ -203,7 +203,7 @@ class PurchaseService {
     return grn;
   }
 
-  /* Added createBillFromPO method to fix error in PurchaseOrderDetail.tsx */
+  // Added createBillFromPO method to fix error in PurchaseOrderDetail.tsx
   createBillFromPO(poId: string, user: any) {
     const po = this.getPOById(poId);
     if (!po) throw new Error("PO not found");

@@ -1,24 +1,28 @@
-import { Item, StockMove, Warehouse, Assembly } from '../types';
+import { Item, StockMove, AppSettings, Assembly, Warehouse, User } from '../types';
 import { auditService } from './audit.service';
 
 class ItemService {
   private items: Item[] = [];
   private stockMoves: StockMove[] = [];
   private assemblies: Assembly[] = [];
+  private warehouses: Warehouse[] = [{ id: 'WH01', name: 'Main Warehouse', location: 'Dubai' }];
 
   constructor() {
     this.loadData();
   }
 
   private loadData() {
-    const items = localStorage.getItem('klencare_items');
-    if (items) this.items = JSON.parse(items);
+    const itemsData = localStorage.getItem('klencare_items');
+    if (itemsData) this.items = JSON.parse(itemsData);
+    
+    const movesData = localStorage.getItem('klencare_stock_moves');
+    if (movesData) this.stockMoves = JSON.parse(movesData);
 
-    const moves = localStorage.getItem('klencare_stock_moves');
-    if (moves) this.stockMoves = JSON.parse(moves);
-
-    const assemblies = localStorage.getItem('klencare_assemblies');
-    if (assemblies) this.assemblies = JSON.parse(assemblies);
+    const assyData = localStorage.getItem('klencare_assemblies');
+    if (assyData) this.assemblies = JSON.parse(assyData);
+    
+    const whData = localStorage.getItem('klencare_warehouses');
+    if (whData) this.warehouses = JSON.parse(whData);
 
     if (this.items.length === 0) {
       this.seedData();
@@ -27,67 +31,29 @@ class ItemService {
 
   private seedData() {
     this.items = [
-      {
-        id: 'ITM-001',
-        name: 'Industrial Cleaner X1',
-        sku: 'IC-X1-001',
-        itemType: 'Goods',
-        unit: 'pcs',
-        category: 'Chemicals',
-        taxCode: 'VAT 5%',
-        taxPreference: 'Taxable',
-        sellingPrice: 150,
-        salesDescription: 'Heavy duty industrial cleaner',
-        purchasePrice: 90,
-        purchaseDescription: 'Raw industrial cleaner base',
-        trackInventory: true,
-        openingStock: 100,
-        openingStockRate: 90,
-        reorderLevel: 20,
-        reorderQty: 50,
-        status: 'Active',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      },
-      {
-        id: 'ITM-002',
-        name: 'Safety Gloves Pro',
-        sku: 'SG-PRO-002',
-        itemType: 'Goods',
-        unit: 'box',
-        category: 'Safety',
-        taxCode: 'VAT 5%',
-        taxPreference: 'Taxable',
-        sellingPrice: 45,
-        salesDescription: 'Nitrile safety gloves 100pk',
-        purchasePrice: 25,
-        purchaseDescription: 'Safety gloves wholesale',
-        trackInventory: true,
-        openingStock: 500,
-        openingStockRate: 25,
-        reorderLevel: 100,
-        reorderQty: 200,
-        status: 'Active',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+      { 
+        id: 'ITM-001', 
+        name: 'Sample Industrial Cleaner', 
+        sku: 'SIC-001', 
+        itemType: 'Goods', 
+        unit: 'pcs', 
+        category: 'Chemicals', 
+        taxCode: 'VAT 5%', 
+        taxPreference: 'Taxable', 
+        sellingPrice: 150, 
+        salesDescription: 'Premium industrial grade cleaner', 
+        purchasePrice: 80, 
+        purchaseDescription: 'Bulk cleaner supply', 
+        trackInventory: true, 
+        openingStock: 100, 
+        openingStockRate: 80, 
+        reorderLevel: 20, 
+        reorderQty: 50, 
+        status: 'Active', 
+        createdAt: new Date().toISOString(), 
+        updatedAt: new Date().toISOString() 
       }
     ];
-
-    this.items.forEach(item => {
-      if (item.trackInventory && item.openingStock > 0) {
-        this.stockMoves.push({
-          id: `MOVE-${Math.random().toString(36).substr(2, 9)}`,
-          itemId: item.id,
-          warehouseId: 'WH01',
-          refType: 'OPENING',
-          refNo: 'OPEN-STOCK',
-          inQty: item.openingStock,
-          outQty: 0,
-          timestamp: new Date().toISOString()
-        });
-      }
-    });
-
     this.saveData();
   }
 
@@ -95,13 +61,15 @@ class ItemService {
     localStorage.setItem('klencare_items', JSON.stringify(this.items));
     localStorage.setItem('klencare_stock_moves', JSON.stringify(this.stockMoves));
     localStorage.setItem('klencare_assemblies', JSON.stringify(this.assemblies));
+    localStorage.setItem('klencare_warehouses', JSON.stringify(this.warehouses));
   }
 
+  // To maintain compatibility with components that await the result
   getItems(filters: any = {}, page: number = 1, pageSize: number = 10) {
     let filtered = [...this.items];
     if (filters.search) {
       const s = filters.search.toLowerCase();
-      filtered = filtered.filter((i: any) => i.name.toLowerCase().includes(s) || i.sku.toLowerCase().includes(s));
+      filtered = filtered.filter(i => i.name.toLowerCase().includes(s) || i.sku.toLowerCase().includes(s));
     }
     if (filters.status) {
       filtered = filtered.filter(i => i.status === filters.status);
@@ -116,41 +84,28 @@ class ItemService {
   }
 
   getItemById(id: string) {
-    return this.items.find(i => i.id === id);
+    return this.items.find(i => i.id.toString() === id.toString());
   }
 
   getItemBySku(sku: string) {
     return this.items.find(i => i.sku === sku);
   }
 
-  createItem(data: any, user: any) {
+  createItem(data: any, user?: User | null) {
     const newItem: Item = {
       ...data,
-      id: `ITM-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
+      id: data.id || `ITM-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       status: data.status || 'Active'
     };
     this.items.push(newItem);
-    
-    if (newItem.trackInventory && newItem.openingStock > 0) {
-      this.addStockMove({
-        itemId: newItem.id,
-        warehouseId: 'WH01',
-        refType: 'OPENING',
-        refNo: 'INITIAL',
-        inQty: newItem.openingStock,
-        outQty: 0,
-        note: 'Initial opening stock'
-      });
-    }
-
     this.saveData();
     if (user) auditService.log(user, 'CREATE', 'ITEM', newItem.id, `Created item ${newItem.name}`);
     return newItem;
   }
 
-  updateItem(id: string, data: any, user: any) {
+  updateItem(id: string, data: any, user?: User | null) {
     const idx = this.items.findIndex(i => i.id === id);
     if (idx !== -1) {
       this.items[idx] = { ...this.items[idx], ...data, updatedAt: new Date().toISOString() };
@@ -161,124 +116,32 @@ class ItemService {
     return null;
   }
 
-  deleteItem(id: string, user: any) {
+  deleteItem(id: string, user?: User | null) {
     const item = this.getItemById(id);
     this.items = this.items.filter(i => i.id !== id);
     this.saveData();
     if (item && user) auditService.log(user, 'DELETE', 'ITEM', id, `Deleted item ${item.name}`);
   }
 
-  calculateStock(itemOrId: any, warehouseId?: string) {
-    const itemId = typeof itemOrId === 'string' ? itemOrId : itemOrId.id;
-    let moves = this.stockMoves.filter(m => m.itemId === itemId);
-    if (warehouseId) {
-      moves = moves.filter(m => m.warehouseId === warehouseId);
-    }
-    return moves.reduce((total: number, m: any) => total + (Number(m.inQty) - Number(m.outQty)), 0);
-  }
-
-  getStockByItem(itemId: string) {
-    const moves = this.stockMoves.filter(m => m.itemId === itemId);
-    const balance: Record<string, number> = {};
-    this.getWarehouses().forEach(wh => {
-      balance[wh.id] = this.calculateStock(itemId, wh.id);
+  // Support both item object and ID, plus optional warehouse filter
+  calculateStock(itemIdOrItem: any, warehouseId?: string) {
+    const id = typeof itemIdOrItem === 'string' ? itemIdOrItem : itemIdOrItem.id;
+    const item = typeof itemIdOrItem === 'string' ? this.getItemById(id) : itemIdOrItem;
+    
+    if (!item) return 0;
+    
+    let stock = Number(item.openingStock) || 0;
+    
+    const moves = this.stockMoves.filter(m => m.itemId === id && (!warehouseId || m.warehouseId === warehouseId));
+    moves.forEach(m => {
+      stock += (Number(m.inQty) || 0);
+      stock -= (Number(m.outQty) || 0);
     });
-    return { moves, balance };
+    
+    return stock;
   }
 
-  getAdjustments() {
-    return this.stockMoves.filter(m => m.refType === 'ADJUSTMENT');
-  }
-
-  calculateInventoryValue() {
-    return this.items.reduce((sum, item) => {
-      const stock = this.calculateStock(item.id);
-      return sum + (stock * (Number(item.purchasePrice) || 0));
-    }, 0);
-  }
-
-  getStockMoves() {
-    return this.stockMoves;
-  }
-
-  addStockMove(move: Partial<StockMove>) {
-    const newMove: StockMove = {
-      id: `MOVE-${Math.random().toString(36).substr(2, 9)}`,
-      itemId: move.itemId!,
-      warehouseId: move.warehouseId || 'WH01',
-      refType: move.refType!,
-      refNo: move.refNo!,
-      inQty: Number(move.inQty) || 0,
-      outQty: Number(move.outQty) || 0,
-      timestamp: new Date().toISOString(),
-      note: move.note
-    };
-    this.stockMoves.push(newMove);
-    this.saveData();
-    return newMove;
-  }
-
-  getAssemblies() {
-    return this.assemblies;
-  }
-
-  createAssembly(data: any, user: any) {
-    const newAssy: Assembly = {
-      id: `ASSY-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
-      finishedItemId: data.finishedItemId,
-      components: data.components,
-      createdAt: new Date().toISOString()
-    };
-    this.assemblies.push(newAssy);
-    this.saveData();
-    if (user) auditService.log(user, 'CREATE', 'ASSEMBLY', newAssy.id, `Created assembly BOM for ${this.getItemById(data.finishedItemId)?.name}`);
-    return newAssy;
-  }
-
-  buildAssembly(assyId: string, warehouseId: string, quantity: number, user: any) {
-    const assy = this.assemblies.find(a => a.id === assyId);
-    if (!assy) throw new Error("Assembly not found");
-
-    const finishedItem = this.getItemById(assy.finishedItemId);
-    if (!finishedItem) throw new Error("Finished item not found");
-
-    if (!this.getSettings().allowNegativeStock) {
-      assy.components.forEach(comp => {
-        const available = this.calculateStock(comp.itemId, warehouseId);
-        if (available < comp.quantity * quantity) {
-          throw new Error(`Insufficient stock for component ${this.getItemById(comp.itemId)?.name}`);
-        }
-      });
-    }
-
-    const refNo = `BUILD-${Date.now().toString().slice(-6)}`;
-
-    assy.components.forEach(comp => {
-      this.addStockMove({
-        itemId: comp.itemId,
-        warehouseId,
-        refType: 'ASSEMBLY_CONSUME',
-        refNo,
-        inQty: 0,
-        outQty: comp.quantity * quantity,
-        note: `Consumed for building ${finishedItem.name}`
-      });
-    });
-
-    this.addStockMove({
-      itemId: finishedItem.id,
-      warehouseId,
-      refType: 'ASSEMBLY_PRODUCE',
-      refNo,
-      inQty: quantity,
-      outQty: 0,
-      note: `Produced via assembly ${assy.id}`
-    });
-
-    if (user) auditService.log(user, 'BUILD', 'ASSEMBLY', assy.id, `Built ${quantity} units of ${finishedItem.name}`);
-  }
-
-  getSettings() { 
+  getSettings(): AppSettings { 
     const defaults = {
       companyName: "KLENCARE FZC",
       companyAddress: "9, Rolex Tower, Dubai, UAE",
@@ -287,31 +150,133 @@ class ItemService {
       currency: "AED",
       vatNumber: "",
       allowNegativeStock: false,
-      pdfFooter: "Thank you for your business. KLENCARE FZC",
+      pdfFooter: "Thank you for your business.",
       logoUrl: "https://res.cloudinary.com/dkro3vzx5/image/upload/Gemini_Generated_Image_o6s2wbo6s2wbo6s2.png"
     };
-    return JSON.parse(localStorage.getItem('klencare_settings') || JSON.stringify(defaults)); 
+    const stored = localStorage.getItem('klencare_settings');
+    return stored ? JSON.parse(stored) : defaults;
   }
 
   updateSettings(settings: any) {
     localStorage.setItem('klencare_settings', JSON.stringify(settings));
   }
 
-  getLowStockItems(items?: Item[]) {
-    const list = items || this.items;
-    return list.filter(i => {
-      if (!i.trackInventory) return false;
-      const stock = this.calculateStock(i.id);
-      return stock <= (Number(i.reorderLevel) || 0);
-    });
+  getLowStockItems() {
+    return this.items.filter(i => i.trackInventory && this.calculateStock(i.id) <= (i.reorderLevel || 0));
   }
 
-  getWarehouses(): Warehouse[] {
-    return [{ id: 'WH01', name: 'Main Warehouse', location: 'Dubai' }];
+  calculateInventoryValue() {
+    return this.items.reduce((sum, i) => sum + (this.calculateStock(i.id) * (i.purchasePrice || 0)), 0);
   }
 
+  getStockMoves() {
+    return this.stockMoves;
+  }
+
+  // Added getAdjustments method for Adjustments view
+  getAdjustments() {
+    return this.stockMoves.filter(m => m.refType === 'ADJUSTMENT');
+  }
+
+  // Added addStockMove method for inventory tracking across services
+  addStockMove(move: Partial<StockMove>) {
+    const newMove: StockMove = {
+      id: `MOVE-${Math.random().toString(36).substr(2, 9)}`,
+      itemId: move.itemId!,
+      warehouseId: move.warehouseId || 'WH01',
+      refType: move.refType!,
+      refNo: move.refNo!,
+      inQty: move.inQty || 0,
+      outQty: move.outQty || 0,
+      timestamp: new Date().toISOString(),
+      note: move.note
+    };
+    this.stockMoves.push(newMove);
+    this.saveData();
+    return newMove;
+  }
+
+  getWarehouses() {
+    return this.warehouses;
+  }
+
+  // Added findOrCreateWarehouse method for GRN imports
   findOrCreateWarehouse(name: string) {
-    return this.getWarehouses()[0];
+    let wh = this.warehouses.find(w => w.name === name);
+    if (!wh) {
+      wh = { id: `WH-${Math.random().toString(36).substr(2, 4).toUpperCase()}`, name, location: 'Unknown' };
+      this.warehouses.push(wh);
+      this.saveData();
+    }
+    return wh;
+  }
+
+  // Added getStockByItem method for ItemDetail view
+  getStockByItem(id: string) {
+    const moves = this.stockMoves.filter(m => m.itemId === id);
+    const balance: Record<string, number> = {};
+    
+    const item = this.getItemById(id);
+    if (item) {
+      // Default initial balance to WH01 for scaffold
+      balance['WH01'] = Number(item.openingStock) || 0;
+    }
+
+    moves.forEach(m => {
+      if (!balance[m.warehouseId]) balance[m.warehouseId] = 0;
+      balance[m.warehouseId] += (Number(m.inQty) || 0);
+      balance[m.warehouseId] -= (Number(m.outQty) || 0);
+    });
+
+    return { moves, balance };
+  }
+
+  // Added assembly management methods for Assemblies view
+  getAssemblies() {
+    return this.assemblies;
+  }
+
+  createAssembly(data: any, user?: User | null) {
+    const newAssy: Assembly = {
+      id: `ASSY-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
+      ...data,
+      createdAt: new Date().toISOString()
+    };
+    this.assemblies.push(newAssy);
+    this.saveData();
+    if (user) auditService.log(user, 'CREATE', 'ASSEMBLY', newAssy.id, `Defined BOM for ${data.finishedItemId}`);
+    return newAssy;
+  }
+
+  buildAssembly(assyId: string, warehouseId: string, qty: number, user?: User | null) {
+    const assy = this.assemblies.find(a => a.id === assyId);
+    if (!assy) throw new Error("Assembly BOM not found");
+
+    // 1. Consume components
+    assy.components.forEach(comp => {
+      this.addStockMove({
+        itemId: comp.itemId,
+        warehouseId,
+        refType: 'ASSEMBLY_CONSUME',
+        refNo: `BUILD-${assyId.slice(-4)}`,
+        inQty: 0,
+        outQty: comp.quantity * qty,
+        note: `Consumed for building ${qty} units of assembly`
+      });
+    });
+
+    // 2. Produce finished item
+    this.addStockMove({
+      itemId: assy.finishedItemId,
+      warehouseId,
+      refType: 'ASSEMBLY_PRODUCE',
+      refNo: `BUILD-${assyId.slice(-4)}`,
+      inQty: qty,
+      outQty: 0,
+      note: `Produced via assembly build`
+    });
+
+    if (user) auditService.log(user, 'BUILD', 'ASSEMBLY', assyId, `Built ${qty} units of assembly`);
   }
 }
 
