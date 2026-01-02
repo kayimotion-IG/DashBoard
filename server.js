@@ -3,6 +3,7 @@ const { Pool } = require('pg');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const path = require('path');
+const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -32,7 +33,7 @@ const authenticateToken = (req, res, next) => {
 const authorize = (roles = []) => {
   return (req, res, next) => {
     if (!roles.includes(req.user.role)) {
-      return res.status(403).json({ error: 'Insufficient permissions for this action' });
+      return res.status(403).json({ error: 'Insufficient permissions' });
     }
     next();
   };
@@ -49,7 +50,7 @@ app.post('/api/auth/login', async (req, res) => {
       const token = jwt.sign({ id: user.id, username: user.username, role: user.role, name: user.name }, JWT_SECRET, { expiresIn: '24h' });
       res.json({ 
         token, 
-        user: { id: user.id, name: user.name, role: user.role, email: user.email } 
+        user: { id: user.id, name: user.name, role: user.role, email: user.email, username: user.username } 
       });
     } else {
       res.status(401).json({ error: 'Invalid credentials' });
@@ -57,6 +58,39 @@ app.post('/api/auth/login', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// --- USER MANAGEMENT API (Admin Only) ---
+app.get('/api/users', authenticateToken, authorize(['Admin']), async (req, res) => {
+  try {
+    const result = await pool.query('SELECT id, username, name, email, role, created_at FROM users ORDER BY created_at DESC');
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/users', authenticateToken, authorize(['Admin']), async (req, res) => {
+  const { name, username, email, role } = req.body;
+  // Generate a random 10-character password for the team member
+  const rawPassword = crypto.randomBytes(5).toString('hex').toUpperCase();
+  const passwordHash = await bcrypt.hash(rawPassword, 10);
+
+  try {
+    const result = await pool.query(
+      'INSERT INTO users (name, username, email, role, password_hash) VALUES ($1, $2, $3, $4, $5) RETURNING id, username, name, role',
+      [name, username, email, role, passwordHash]
+    );
+    res.json({ ...result.rows[0], generatedPassword: rawPassword });
+  } catch (err) {
+    res.status(500).json({ error: err.message.includes('unique constraint') ? 'Username already exists' : err.message });
+  }
+});
+
+app.delete('/api/users/:id', authenticateToken, authorize(['Admin']), async (req, res) => {
+  if (parseInt(req.params.id) === req.user.id) return res.status(400).json({ error: 'Cannot delete your own account' });
+  try {
+    await pool.query('DELETE FROM users WHERE id = $1', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // --- ITEMS API ---
@@ -93,36 +127,9 @@ app.post('/api/customers', authenticateToken, authorize(['Admin']), async (req, 
   res.json(result.rows[0]);
 });
 
-// --- SALES ORDERS API ---
-app.get('/api/sales/orders', authenticateToken, async (req, res) => {
-  const result = await pool.query('SELECT * FROM sales_orders ORDER BY date DESC');
-  res.json(result.rows);
-});
-
-app.post('/api/sales/orders', authenticateToken, authorize(['Admin']), async (req, res) => {
-  const { orderNumber, customerId, date, total, lines } = req.body;
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    const soResult = await client.query(
-      'INSERT INTO sales_orders (order_number, customer_id, date, total, status) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [orderNumber, customerId, date, total, 'Confirmed']
-    );
-    // Insert lines if any...
-    await client.query('COMMIT');
-    res.json(soResult.rows[0]);
-  } catch (e) {
-    await client.query('ROLLBACK');
-    res.status(500).json({ error: e.message });
-  } finally {
-    client.release();
-  }
-});
-
-// --- SYSTEM INITIALIZATION (One-time Seed) ---
+// --- SYSTEM INITIALIZATION ---
 async function initDb() {
   try {
-    // Check if tables exist, if not create them (Simple schema auto-gen for demo)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -154,26 +161,15 @@ async function initDb() {
         billing_address TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
-      CREATE TABLE IF NOT EXISTS sales_orders (
-        id SERIAL PRIMARY KEY,
-        order_number TEXT UNIQUE,
-        customer_id INTEGER,
-        date DATE,
-        total NUMERIC,
-        status TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
     `);
 
     const userCount = await pool.query('SELECT count(*) FROM users');
     if (parseInt(userCount.rows[0].count) === 0) {
-      console.log('Seeding initial production accounts...');
+      console.log('Seeding master admin account...');
       const adminPass = await bcrypt.hash('KlenCare@2026!', 10);
-      const viewerPass = await bcrypt.hash('ReviewOnly@2026!', 10);
-      
       await pool.query(
-        'INSERT INTO users (username, password_hash, name, role, email) VALUES ($1, $2, $3, $4, $5), ($6, $7, $8, $9, $10)',
-        ['testadmin', adminPass, 'System Admin', 'Admin', 'admin@klencare.net', 'reviewer', viewerPass, 'Audit Reviewer', 'readonly', 'reviewer@klencare.net']
+        'INSERT INTO users (username, password_hash, name, role, email) VALUES ($1, $2, $3, $4, $5)',
+        ['admin', adminPass, 'System Owner', 'Admin', 'admin@klencare.net']
       );
     }
   } catch (err) {
@@ -182,5 +178,5 @@ async function initDb() {
 }
 
 initDb().then(() => {
-  app.listen(PORT, () => console.log(`KlenCare ERP Engine (Postgres Persistent) running on ${PORT}`));
+  app.listen(PORT, () => console.log(`KlenCare ERP Engine running on ${PORT}`));
 });

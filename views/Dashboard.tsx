@@ -4,7 +4,7 @@ import {
   DollarSign, Wallet, Clock, CheckCircle2, 
   ChevronRight, Filter, Truck, ShieldCheck, Activity,
   Sparkles, Building, Receipt, ArrowUpRight, ArrowDownRight,
-  X, Info
+  X, Info, UserCheck
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -36,19 +36,8 @@ const Dashboard = () => {
   
   const pendingOrders = sos.filter(s => s.status === 'Confirmed' || s.status === 'Draft').slice(0, 5);
 
-  // Recent Global Activity Feed
   const recentPayments = purchaseService.getPaymentsMade().slice(-3).reverse();
   const recentInvoices = salesService.getInvoices().slice(-2).reverse();
-
-  const chartData = [
-    { name: 'Mon', sales: 4200 },
-    { name: 'Tue', sales: 3800 },
-    { name: 'Wed', sales: 6100 },
-    { name: 'Thu', sales: 5200 },
-    { name: 'Fri', sales: 4800 },
-    { name: 'Sat', sales: 2900 },
-    { name: 'Sun', sales: 3400 },
-  ];
 
   const StatCard = ({ label, value, trend, icon, colorClass, onClick, active }: any) => (
     <div 
@@ -71,7 +60,7 @@ const Dashboard = () => {
   );
 
   return (
-    <div className="space-y-6 pb-12 animate-in fade-in">
+    <div className="space-y-6 pb-12 animate-in fade-in text-slate-900">
       {/* Dynamic Header Banner */}
       <div className="relative overflow-hidden bg-slate-900 rounded-[40px] p-10 shadow-2xl border border-slate-800">
          <div className="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 bg-[#fbaf0f] rounded-full mix-blend-multiply filter blur-3xl opacity-5"></div>
@@ -213,6 +202,19 @@ const Dashboard = () => {
               ))}
             </div>
           </div>
+
+          {/* Admin Management Widget */}
+          {user?.role === 'Admin' && (
+            <div className="bg-[#fbaf0f] p-8 rounded-[32px] shadow-xl text-slate-900 relative overflow-hidden group cursor-pointer" onClick={() => navigate('/admin/team')}>
+              <div className="absolute top-0 right-0 -mr-8 -mt-8 w-24 h-24 bg-white/20 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
+              <UserCheck size={32} className="mb-4" />
+              <h3 className="text-lg font-black tracking-tight mb-1">Team Access Control</h3>
+              <p className="text-xs font-bold text-slate-800 uppercase tracking-widest">Generate Team Credentials</p>
+              <div className="mt-6 flex items-center gap-2 text-[10px] font-black uppercase">
+                Manage Organization <ChevronRight size={14} />
+              </div>
+            </div>
+          )}
 
           <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm">
              <div className="flex items-center gap-3 mb-6">

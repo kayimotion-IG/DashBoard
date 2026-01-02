@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, Mail, AlertCircle, Loader2, ShieldCheck, User as UserIcon } from 'lucide-react';
+import { Lock, AlertCircle, Loader2, ShieldCheck, User as UserIcon } from 'lucide-react';
 import { itemService } from '../../services/item.service';
 
 interface LoginProps {
@@ -7,7 +7,7 @@ interface LoginProps {
 }
 
 export default function Login({ onLogin }: LoginProps) {
-  const [username, setUsername] = useState('testadmin');
+  const [username, setUsername] = useState('admin');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -75,7 +75,7 @@ export default function Login({ onLogin }: LoginProps) {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="appearance-none block w-full pl-12 pr-4 py-4 bg-slate-950 border border-slate-800 rounded-2xl text-white placeholder-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-[#fbaf0f] text-sm font-bold transition-all"
-                  placeholder="testadmin"
+                  placeholder="admin"
                 />
               </div>
             </div>
@@ -108,7 +108,7 @@ export default function Login({ onLogin }: LoginProps) {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex justify-center py-4 px-4 border border-transparent rounded-2xl shadow-[0_20px_50px_rgba(251,175,15,0.2)] text-xs font-black uppercase tracking-[0.2em] text-slate-900 bg-[#fbaf0f] hover:bg-[#e59b00] focus:outline-none focus:ring-4 focus:ring-amber-500/20 transition-all active:scale-95 disabled:opacity-70 disabled:grayscale"
+                className="w-full flex justify-center py-4 px-4 border border-transparent rounded-2xl shadow-[0_20px_50px_rgba(251,175,15,0.2)] text-xs font-black uppercase tracking-[0.2em] text-slate-900 bg-[#fbaf0f] hover:bg-[#e59b00] focus:outline-none focus:ring-4 focus:ring-amber-50/20 transition-all active:scale-95 disabled:opacity-70 disabled:grayscale"
               >
                 {loading ? <Loader2 className="animate-spin" size={20} /> : 'Authenticate Logic Gate'}
               </button>
@@ -128,11 +128,11 @@ export default function Login({ onLogin }: LoginProps) {
         </div>
         <div className="mt-8 flex flex-col items-center gap-2">
           <p className="text-[10px] text-slate-600 font-bold uppercase tracking-widest">
-            &copy; 2024 KlenCare Technologies UAE
+            &copy; 2026 KlenCare Technologies UAE
           </p>
           <div className="flex items-center gap-4">
              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
-             <span className="text-[8px] text-slate-700 font-black uppercase tracking-tighter">Production Environment 4.2.0</span>
+             <span className="text-[8px] text-slate-700 font-black uppercase tracking-tighter">Enterprise Mode Active</span>
           </div>
         </div>
       </div>
