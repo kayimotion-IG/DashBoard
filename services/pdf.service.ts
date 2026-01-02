@@ -2,7 +2,6 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { AppSettings, SalesOrder, Invoice, Customer, PurchaseOrder, Vendor, User, CreditNote } from '../types';
 import { itemService } from './item.service';
-import { salesService } from './sales.service';
 
 const KLENCARE_BLUE = '#0B4AA2';
 const KLENCARE_GOLD = '#fbaf0f';
@@ -22,7 +21,7 @@ export class PDFService {
     doc.setFont('helvetica', 'bold');
     doc.text('KlenCare FZC', 15, 25);
 
-    // 2. Uniform Address & Contact Block (Exact match in font family, size, weight)
+    // 2. Uniform Address & Contact Block
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     doc.setTextColor(TEXT_DARK);
@@ -64,7 +63,7 @@ export class PDFService {
     const doc = new jsPDF();
     this.drawHeader(doc, 'Tax Invoice');
 
-    // Metadata Info Box (Right Side) - SPECIFIC ORDER
+    // Metadata Info Box (Right Side) - STRICT ORDER
     doc.setFontSize(9);
     doc.setTextColor(KLENCARE_GOLD);
     doc.setFont('helvetica', 'bold');
@@ -143,7 +142,7 @@ export class PDFService {
 
     doc.setFontSize(8);
     doc.setTextColor(TEXT_GRAY);
-    doc.text('Thank you for choosing KlenCare FZC for your industrial solutions.', 15, 280);
+    doc.text('Thank you for choosing KlenCare FZC.', 15, 280);
     doc.text(`Page 1 of 1`, 195, 280, { align: 'right' });
 
     if (isPreview) return doc.output('bloburl');
@@ -153,6 +152,33 @@ export class PDFService {
   async generateSalesOrder(so: SalesOrder, customer: Customer, user: User | null, isPreview = false) {
     const doc = new jsPDF();
     this.drawHeader(doc, 'Sales Order');
+
+    doc.setFontSize(9);
+    doc.setTextColor(KLENCARE_GOLD);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Order #:', 130, 40);
+    doc.text('Date:', 130, 46);
+    doc.text('Delivery Date:', 130, 52);
+    doc.text('TRN:', 130, 58);
+    doc.text('LPO No:', 130, 64);
+
+    doc.setTextColor(TEXT_DARK);
+    doc.setFont('helvetica', 'normal');
+    doc.text(so.orderNumber, 195, 40, { align: 'right' });
+    doc.text(new Date(so.date).toLocaleDateString('en-GB'), 195, 46, { align: 'right' });
+    doc.text(so.shipmentDate ? new Date(so.shipmentDate).toLocaleDateString('en-GB') : '—', 195, 52, { align: 'right' });
+    doc.text('100234567800003', 195, 58, { align: 'right' });
+    doc.text(so.lpoNumber || '—', 195, 64, { align: 'right' });
+
+    autoTable(doc, {
+      startY: 120,
+      head: [['#', 'Item Description', 'Qty', 'Rate', 'Total']],
+      body: so.lines.map((l, i) => [i + 1, l.itemName, l.quantity, l.rate.toFixed(2), l.total.toFixed(2)]),
+      theme: 'grid',
+      headStyles: { fillColor: KLENCARE_GOLD },
+      columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' } }
+    });
+
     if (isPreview) return doc.output('bloburl');
     doc.save(`${so.orderNumber}.pdf`);
   }

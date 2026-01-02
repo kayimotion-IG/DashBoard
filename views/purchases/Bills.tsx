@@ -1,8 +1,7 @@
-
 import React, { useState } from 'react';
 import { 
   FileText, Search, Filter, Plus,
-  Calendar, ArrowRight, Clock, Truck, Wallet, FileDown
+  Calendar, ArrowRight, Clock, Truck, Wallet, FileDown, HandCoins
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { purchaseService } from '../../services/purchase.service';
@@ -34,6 +33,11 @@ export default function Bills() {
     return bill.billNumber.toLowerCase().includes(search.toLowerCase()) || 
            vendor?.name.toLowerCase().includes(search.toLowerCase());
   });
+
+  const handlePayBill = (e: React.MouseEvent, billId: string, vendorId: string) => {
+    e.stopPropagation();
+    navigate(`/purchases/payments/new?billId=${billId}&vendorId=${vendorId}`);
+  };
 
   return (
     <div className="space-y-6">
@@ -117,7 +121,16 @@ export default function Bills() {
                       <BillStatusBadge status={bill.status} />
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex justify-end gap-2">
+                        {bill.balanceDue > 0 && (
+                          <button 
+                            onClick={(e) => handlePayBill(e, bill.id, bill.vendorId)}
+                            className="p-2 text-[#fbaf0f] hover:bg-[#fbaf0f]/10 rounded-xl transition-all"
+                            title="Pay this bill"
+                          >
+                            <HandCoins size={18} />
+                          </button>
+                        )}
                         <button className="p-2 text-slate-400 hover:text-slate-900 transition-all"><ArrowRight size={18} /></button>
                       </div>
                     </td>

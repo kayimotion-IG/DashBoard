@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { 
   Building2, Save, Globe, Phone, Mail, 
@@ -49,9 +48,31 @@ export default function Settings() {
     
     let url: any = '';
     if (type === 'INV') {
-      url = await pdfService.generateInvoice({ id: '1', invoiceNumber: 'INV-SAMPLE-001', customerId: 'DUMMY', date: new Date().toISOString(), dueDate: new Date().toISOString(), total: 1050, balanceDue: 1050, status: 'Sent', lines: [{ id: '1', itemId: '1', itemName: 'Premium Industrial Solution', quantity: 1, rate: 1000, taxAmount: 50, total: 1050 }] }, dummyCust, null, true);
+      url = await pdfService.generateInvoice({ 
+        id: '1', 
+        invoiceNumber: 'INV-SAMPLE-001', 
+        lpoNumber: 'LPO-778899', // ADDED: Sample LPO for preview
+        customerId: 'DUMMY', 
+        date: new Date().toISOString(), 
+        dueDate: new Date().toISOString(), 
+        total: 1050, 
+        balanceDue: 1050, 
+        status: 'Sent', 
+        lines: [{ id: '1', itemId: '1', itemName: 'Premium Industrial Solution', quantity: 1, rate: 1000, taxAmount: 50, total: 1050 }] 
+      }, dummyCust, null, true);
     } else if (type === 'SO') {
-      url = await pdfService.generateSalesOrder({ id: '1', orderNumber: 'SO-SAMPLE-001', customerId: 'DUMMY', date: new Date().toISOString(), status: 'Confirmed', subTotal: 1000, taxTotal: 50, total: 1050, lines: [{ id: '1', itemId: '1', itemName: 'Batch Stock Item X-01', quantity: 1, rate: 1000, taxAmount: 50, total: 1050 }] }, dummyCust, null, true);
+      url = await pdfService.generateSalesOrder({ 
+        id: '1', 
+        orderNumber: 'SO-SAMPLE-001', 
+        lpoNumber: 'LPO-778899', // ADDED: Sample LPO for preview
+        customerId: 'DUMMY', 
+        date: new Date().toISOString(), 
+        status: 'Confirmed', 
+        subTotal: 1000, 
+        taxTotal: 50, 
+        total: 1050, 
+        lines: [{ id: '1', itemId: '1', itemName: 'Batch Stock Item X-01', quantity: 1, rate: 1000, taxAmount: 50, total: 1050 }] 
+      }, dummyCust, null, true);
     } else if (type === 'PO') {
       url = await pdfService.generatePurchaseOrder({ id: '1', poNumber: 'PO-SAMPLE-001', vendorId: 'VND', date: new Date().toISOString(), status: 'Issued', total: 5000, lines: [{ id: '1', itemId: '1', itemName: 'Bulk Warehouse Order', quantity: 50, rate: 100, total: 5000 }] }, dummyVendor, null, true);
     } else if (type === 'ST') {

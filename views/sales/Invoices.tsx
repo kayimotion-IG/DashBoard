@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { 
   Receipt, Search, Filter, Plus, 
@@ -32,7 +31,6 @@ export default function Invoices() {
   
   const invoices = salesService.getInvoices();
 
-  // REAL-TIME SEARCH: High Performance Filter
   const filteredInvoices = useMemo(() => {
     const sorted = [...invoices].reverse();
     if (!search) return sorted;
@@ -120,7 +118,11 @@ export default function Invoices() {
                 const so = inv.soId ? salesService.getSOById(inv.soId) : null;
                 
                 return (
-                  <tr key={inv.id} className="hover:bg-slate-50/50 transition-colors group cursor-pointer">
+                  <tr 
+                    key={inv.id} 
+                    className="hover:bg-slate-50/50 transition-colors group cursor-pointer"
+                    onClick={() => navigate(`/sales/invoices/new?id=${inv.id}`)}
+                  >
                     <td className="px-8 py-6">
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-[18px] flex items-center justify-center font-black text-xs shadow-sm group-hover:scale-105 transition-transform">INV</div>
@@ -155,7 +157,7 @@ export default function Invoices() {
                       <StatusBadge status={inv.status} />
                     </td>
                     <td className="px-8 py-6 text-right">
-                      <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                      <div className="flex justify-end gap-2">
                         <button 
                           onClick={(e) => handleDownload(e, inv)}
                           className="p-3 text-slate-400 hover:text-blue-600 hover:bg-white hover:shadow-md border border-transparent hover:border-slate-100 rounded-xl transition-all"
@@ -163,7 +165,12 @@ export default function Invoices() {
                         >
                           <FileDown size={18} />
                         </button>
-                        <button className="p-3 text-slate-400 hover:text-slate-900 hover:bg-white hover:shadow-md border border-transparent hover:border-slate-100 rounded-xl transition-all"><ArrowRight size={18} /></button>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); navigate(`/sales/invoices/new?id=${inv.id}`); }}
+                          className="p-3 text-slate-400 hover:text-slate-900 hover:bg-white hover:shadow-md border border-transparent hover:border-slate-100 rounded-xl transition-all"
+                        >
+                          <ArrowRight size={18} />
+                        </button>
                       </div>
                     </td>
                   </tr>

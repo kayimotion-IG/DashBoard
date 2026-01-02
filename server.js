@@ -8,6 +8,19 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json({ limit: '50mb' }));
 
+// --- AUTH API ---
+app.post('/api/login', async (req, res) => {
+  const { username, password } = req.body;
+  // Security logic matching App.tsx production requirements
+  if (username === 'testadmin' && password === 'KlenCare@2026!') {
+    return res.json({ 
+      success: true, 
+      user: { id: '1', name: 'KlenCare Admin', email: 'testadmin@klencare.com', role: 'Admin' } 
+    });
+  }
+  res.status(401).json({ success: false, message: 'Invalid credentials' });
+});
+
 // --- ITEMS API ---
 app.get('/api/items', async (req, res) => {
   try {

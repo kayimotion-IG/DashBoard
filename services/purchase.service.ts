@@ -1,4 +1,3 @@
-
 import { Vendor, PurchaseOrder, Bill, PaymentMade, GoodsReceive } from '../types';
 import { auditService } from './audit.service';
 import { itemService } from './item.service';
@@ -15,20 +14,18 @@ class PurchaseService {
   }
 
   private loadData() {
-    const vendors = localStorage.getItem('klencare_vendors');
-    if (vendors) this.vendors = JSON.parse(vendors);
+    const data = [
+      { key: 'klencare_vendors', ref: 'vendors' },
+      { key: 'klencare_pos', ref: 'pos' },
+      { key: 'klencare_bills', ref: 'bills' },
+      { key: 'klencare_payments_made', ref: 'payments' },
+      { key: 'klencare_receives', ref: 'receives' },
+    ];
 
-    const pos = localStorage.getItem('klencare_pos');
-    if (pos) this.pos = JSON.parse(pos);
-
-    const bills = localStorage.getItem('klencare_bills');
-    if (bills) this.bills = JSON.parse(bills);
-
-    const payments = localStorage.getItem('klencare_payments_made');
-    if (payments) this.payments = JSON.parse(payments);
-
-    const receives = localStorage.getItem('klencare_receives');
-    if (receives) this.receives = JSON.parse(receives);
+    data.forEach(d => {
+      const stored = localStorage.getItem(d.key);
+      if (stored) (this as any)[d.ref] = JSON.parse(stored);
+    });
 
     if (this.vendors.length === 0) {
       this.seedData();
@@ -55,7 +52,6 @@ class PurchaseService {
       }
     ];
 
-    // Seed a sample bill
     this.bills = [
       {
         id: 'BIL-SEED-01',
@@ -207,6 +203,24 @@ class PurchaseService {
     return grn;
   }
 
+  /* Added createBillFromPO method to fix error in PurchaseOrderDetail.tsx */
+  createBillFromPO(poId: string, user: any) {
+    const po = this.getPOById(poId);
+    if (!po) throw new Error("PO not found");
+    
+    const bill = this.createBill({
+      poId: po.id,
+      vendorId: po.vendorId,
+      date: new Date().toISOString(),
+      dueDate: new Date(Date.now() + 30 * 86400000).toISOString(),
+      total: po.total,
+      billNumber: `BIL-PO-${po.poNumber}`
+    }, user);
+    
+    this.updatePOStatus(poId, 'Billed', user);
+    return bill;
+  }
+
   getBills() { return this.bills; }
 
   createBill(data: any, user: any) {
@@ -223,40 +237,52 @@ class PurchaseService {
     return bill;
   }
 
-  createBillFromPO(poId: string, user: any) {
-    const po = this.getPOById(poId);
-    if (!po) throw new Error("PO not found");
-    return this.createBill({
-      poId: po.id,
-      vendorId: po.vendorId,
-      total: po.total,
-      date: new Date().toISOString(),
-      dueDate: new Date(Date.now() + 30 * 86400000).toISOString()
-    }, user);
-  }
-
   getPaymentsMade() { return this.payments; }
 
   recordPayment(data: any, user: any) {
     const payment: PaymentMade = {
       ...data,
       id: `PMT-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
-      paymentNumber: data.paymentNumber || `PMT-${Date.now().toString().slice(-5)}`,
-      date: data.date || new Date().toISOString()
+      date: data.date || new Date().toISOString(),
+      amount: Number(data.amount)
     };
 
+    let remainingToAllocate = payment.amount;
+
+    // 1. If a specific Bill ID is provided, pay that first
     if (payment.billId) {
       const idx = this.bills.findIndex(b => b.id === payment.billId);
       if (idx !== -1) {
-        this.bills[idx].balanceDue = Math.max(0, this.bills[idx].balanceDue - Number(payment.amount));
+        const allocated = Math.min(this.bills[idx].balanceDue, remainingToAllocate);
+        this.bills[idx].balanceDue = Math.max(0, this.bills[idx].balanceDue - allocated);
+        remainingToAllocate -= allocated;
+        
         if (this.bills[idx].balanceDue <= 0) this.bills[idx].status = 'Paid';
         else this.bills[idx].status = 'Partially Paid';
       }
     }
 
+    // 2. FIFO AUTO-ALLOCATION: If there is still money left (or no billId was selected), 
+    // find other open bills for this vendor and close them out.
+    if (remainingToAllocate > 0) {
+      const vendorBills = this.bills
+        .filter(b => b.vendorId === payment.vendorId && b.balanceDue > 0)
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+      for (const bill of vendorBills) {
+        if (remainingToAllocate <= 0) break;
+        const allocated = Math.min(bill.balanceDue, remainingToAllocate);
+        bill.balanceDue = Number((bill.balanceDue - allocated).toFixed(2));
+        remainingToAllocate = Number((remainingToAllocate - allocated).toFixed(2));
+        
+        if (bill.balanceDue <= 0) bill.status = 'Paid';
+        else bill.status = 'Partially Paid';
+      }
+    }
+
     this.payments.push(payment);
     this.saveData();
-    if (user) auditService.log(user, 'CREATE', 'PAYMENT_MADE', payment.id, `Recorded payment ${payment.paymentNumber} of AED ${payment.amount}`);
+    if (user) auditService.log(user, 'CREATE', 'PAYMENT_MADE', payment.id, `Recorded ${payment.paymentMode} payment of AED ${payment.amount} to Vendor`);
     return payment;
   }
 }

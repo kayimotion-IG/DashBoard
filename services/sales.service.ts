@@ -186,6 +186,7 @@ class SalesService {
       ...data,
       id: `SO-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
       orderNumber: data.orderNumber || `SO-${Date.now().toString().slice(-5)}`,
+      lpoNumber: data.lpoNumber || '',
       status: 'Draft',
       date: data.date || new Date().toISOString()
     };
@@ -208,7 +209,7 @@ class SalesService {
     const inv: Invoice = {
       id: `INV-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
       invoiceNumber: data.invoiceNumber || `INV-${Date.now().toString().slice(-5)}`,
-      lpoNumber: data.lpoNumber || '', // FIXED: Explicitly map the LPO number from input data
+      lpoNumber: data.lpoNumber || '',
       soId: data.soId || '',
       customerId: data.customerId,
       date: data.date || new Date().toISOString(),

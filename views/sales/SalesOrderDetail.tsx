@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, ShoppingCart, Truck, Receipt, 
   CheckCircle2, Clock, Printer, Mail, MoreVertical,
   ChevronRight, AlertCircle, PackageCheck, FileDown, Paperclip,
-  ExternalLink, Wallet
+  ExternalLink, Wallet, FileText
 } from 'lucide-react';
 import { salesService } from '../../services/sales.service';
 import { itemService } from '../../services/item.service';
@@ -104,7 +103,14 @@ export default function SalesOrderDetail() {
               <h1 className="text-3xl font-black text-slate-900">{so.orderNumber}</h1>
               <span className="text-xs font-black px-2 py-0.5 bg-slate-100 text-slate-400 rounded-md border border-slate-200 font-mono uppercase">ID: {so.id}</span>
             </div>
-            <p className="text-sm text-slate-500 font-medium">Placed on {new Date(so.date).toLocaleDateString()}</p>
+            <div className="flex items-center gap-4 mt-1">
+              <p className="text-sm text-slate-500 font-medium">Placed on {new Date(so.date).toLocaleDateString()}</p>
+              {so.lpoNumber && (
+                <div className="flex items-center gap-1.5 text-blue-600 px-2 py-0.5 bg-blue-50 rounded-md border border-blue-100 text-[10px] font-black uppercase">
+                  <FileText size={12} /> LPO: {so.lpoNumber}
+                </div>
+              )}
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-3">

@@ -58,7 +58,7 @@ import { purchaseService } from './services/purchase.service';
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (email: string, pass: string) => Promise<boolean>;
+  login: (username: string, pass: string) => Promise<boolean>;
   logout: () => void;
   can: (p: Permission) => boolean;
   settings: AppSettings;
@@ -71,6 +71,12 @@ export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) throw new Error("useAuth must be used within AuthProvider");
   return context;
+};
+
+// PRODUCTION TEST CREDENTIALS
+const TEST_ACCOUNT = {
+  username: 'testadmin',
+  password: 'KlenCare@2026!'
 };
 
 const SIDEBAR_GROUPS = [
@@ -209,8 +215,24 @@ export default function App() {
     setSettings(itemService.getSettings());
   };
 
-  const login = async (email: string, pass: string) => {
-    if (email === 'admin@klencare.com' && pass === 'Admin@1234') {
+  const login = async (username: string, pass: string) => {
+    // SECURITY CHECK: Production Test Account
+    if (username === TEST_ACCOUNT.username && pass === TEST_ACCOUNT.password) {
+      const newUser: User = { 
+        id: '1', 
+        name: 'KlenCare Admin', 
+        email: 'testadmin@klencare.com', 
+        role: Role.Admin 
+      };
+      setUser(newUser);
+      localStorage.setItem('klencare_session', JSON.stringify(newUser));
+      auditService.log(newUser, 'LOGIN', 'USER', newUser.id, 'Successful production login via test account');
+      navigate('/');
+      return true;
+    }
+    
+    // Legacy support for older admin
+    if (username === 'admin@klencare.com' && pass === 'Admin@1234') {
       const newUser: User = { id: '1', name: 'Administrator', email: 'admin@klencare.com', role: Role.Admin };
       setUser(newUser);
       localStorage.setItem('klencare_session', JSON.stringify(newUser));
@@ -233,7 +255,6 @@ export default function App() {
     return hasPermission(user.role, permission);
   };
 
-  // GLOBAL REAL-TIME SEARCH LOGIC
   const getSearchResults = () => {
      if (!globalSearch || globalSearch.length < 2) return null;
      const s = globalSearch.toLowerCase();
@@ -250,6 +271,7 @@ export default function App() {
 
   if (loading) return <div className="h-screen flex items-center justify-center bg-slate-900 text-[#fbaf0f] font-bold tracking-tighter text-2xl">KlenCare Pro</div>;
 
+  // ROUTE GUARD: Enforce Login Gate
   if (!user && location.pathname !== '/login') {
     return <Navigate to="/login" replace />;
   }
@@ -295,7 +317,9 @@ export default function App() {
                 <p className="text-sm font-medium text-white truncate">{user?.name}</p>
                 <p className="text-[10px] text-[#fbaf0f] uppercase tracking-wider font-bold">{user?.role}</p>
               </div>
-              <button onClick={logout} className="text-slate-400 hover:text-white transition-colors"><LogOut size={18} /></button>
+              <button onClick={logout} className="text-slate-400 hover:text-white transition-colors" title="Logout from system">
+                <LogOut size={18} />
+              </button>
             </div>
           </div>
         </aside>
@@ -315,7 +339,6 @@ export default function App() {
                   className="bg-slate-100 border-transparent focus:bg-white focus:ring-2 focus:ring-amber-100 focus:border-[#fbaf0f] rounded-full py-2 pl-10 pr-4 w-64 lg:w-[450px] outline-none text-sm transition-all" 
                 />
                 
-                {/* Real-time Global Results Overlay */}
                 {showSearchResults && searchResults && (
                    <div className="absolute top-full left-0 mt-3 w-full bg-white rounded-[24px] shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-slate-100 p-2 overflow-hidden z-[100] animate-in slide-in-from-top-2">
                       <div className="max-h-[500px] overflow-y-auto p-4 space-y-6">

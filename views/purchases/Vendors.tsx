@@ -1,8 +1,8 @@
-
 import React, { useState, useMemo } from 'react';
 import { 
   Truck, Search, Filter, Plus, Mail, Phone, 
-  ChevronRight, Wallet, MapPin, FileUp, Edit2, Trash2, X
+  ChevronRight, Wallet, MapPin, FileUp, Edit2, Trash2, X, ArrowRight,
+  HandCoins
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { purchaseService } from '../../services/purchase.service';
@@ -16,7 +16,6 @@ export default function Vendors() {
   
   const vendors = purchaseService.getVendors();
 
-  // REAL-TIME SEARCH: High Fidelity Memoized Filter
   const filteredVendors = useMemo(() => {
     if (!search) return vendors;
     const s = search.toLowerCase();
@@ -31,6 +30,15 @@ export default function Vendors() {
   const handleDelete = (id: string, name: string) => {
     if (!window.confirm(`Are you sure you want to delete vendor "${name}"?`)) return;
     purchaseService.deleteVendor(id, user!);
+  };
+
+  const handleNavigateDetail = (id: string) => {
+    navigate(`/purchases/vendors/edit/${id}`);
+  };
+
+  const handleQuickPay = (e: React.MouseEvent, vendorId: string) => {
+    e.stopPropagation();
+    navigate(`/purchases/payments/new?vendorId=${vendorId}`);
   };
 
   return (
@@ -97,7 +105,11 @@ export default function Vendors() {
               {filteredVendors.length > 0 ? filteredVendors.map(vendor => {
                 const balance = purchaseService.getVendorBalance(vendor.id);
                 return (
-                  <tr key={vendor.id} className="hover:bg-slate-50/50 transition-colors group">
+                  <tr 
+                    key={vendor.id} 
+                    className="hover:bg-slate-50/50 transition-colors group cursor-pointer"
+                    onClick={() => handleNavigateDetail(vendor.id)}
+                  >
                     <td className="px-8 py-6">
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-[18px] flex items-center justify-center font-black text-xs shadow-sm">VND</div>
@@ -133,23 +145,35 @@ export default function Vendors() {
                       </span>
                     </td>
                     <td className="px-8 py-6 text-right">
-                      <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                      <div className="flex items-center justify-end gap-2">
+                        {balance > 0 && (
+                          <button 
+                            onClick={(e) => handleQuickPay(e, vendor.id)}
+                            className="p-3 text-[#fbaf0f] hover:bg-[#fbaf0f]/10 rounded-xl transition-all"
+                            title="Record Payment"
+                          >
+                            <HandCoins size={22} />
+                          </button>
+                        )}
                         <button 
-                          onClick={() => navigate(`/purchases/vendors/edit/${vendor.id}`)}
-                          className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-white rounded-xl shadow-none hover:shadow-md border border-transparent hover:border-slate-100 transition-all"
+                          onClick={(e) => { e.stopPropagation(); navigate(`/purchases/vendors/edit/${vendor.id}`); }}
+                          className="p-3 text-slate-400 hover:text-blue-600 hover:bg-white rounded-xl shadow-none hover:shadow-md border border-transparent hover:border-slate-100 transition-all"
                           title="Edit Profile"
                         >
-                          <Edit2 size={18} />
+                          <Edit2 size={20} />
                         </button>
                         <button 
-                          onClick={() => handleDelete(vendor.id, vendor.name)}
-                          className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-white rounded-xl shadow-none hover:shadow-md border border-transparent hover:border-slate-100 transition-all"
+                          onClick={(e) => { e.stopPropagation(); handleDelete(vendor.id, vendor.name); }}
+                          className="p-3 text-slate-400 hover:text-red-600 hover:bg-white rounded-xl shadow-none hover:shadow-md border border-transparent hover:border-slate-100 transition-all"
                           title="Delete"
                         >
-                          <Trash2 size={18} />
+                          <Trash2 size={20} />
                         </button>
-                        <button className="p-2.5 text-slate-400 hover:text-slate-900 hover:bg-white rounded-xl shadow-none hover:shadow-md border border-transparent hover:border-slate-100 transition-all">
-                          <ChevronRight size={20} />
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); handleNavigateDetail(vendor.id); }}
+                          className="p-3 text-slate-400 hover:text-slate-900 hover:bg-white rounded-xl shadow-none hover:shadow-md border border-transparent hover:border-slate-100 transition-all"
+                        >
+                          <ArrowRight size={24} />
                         </button>
                       </div>
                     </td>
