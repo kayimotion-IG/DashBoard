@@ -1,15 +1,14 @@
-import React, { useState } from 'react';
+
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   TrendingUp, TrendingDown, Package, 
   DollarSign, Wallet, Clock, CheckCircle2, 
   ChevronRight, Filter, Truck, ShieldCheck, Activity,
-  Sparkles, Building, Receipt, ArrowUpRight, ArrowDownRight,
-  X, Info, UserCheck
+  Building, Receipt, ArrowUpRight, ArrowDownRight,
+  X, Info, UserCheck, Boxes, FileText, ShoppingCart, PackageCheck,
+  BarChart3, Layers, AlertCircle, ArrowRight, HandCoins
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  ResponsiveContainer, AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip
-} from 'recharts';
 import { salesService } from '../services/sales.service';
 import { purchaseService } from '../services/purchase.service';
 import { itemService } from '../services/item.service';
@@ -18,297 +17,262 @@ import { useAuth } from '../App';
 const Dashboard = () => {
   const navigate = useNavigate();
   const { settings, user } = useAuth();
-  const [showAPDetails, setShowAPDetails] = useState(false);
   
-  const sos = salesService?.getSalesOrders?.() || [];
-  const activeSos = sos.filter(s => s.status !== 'Invoiced' && s.status !== 'Closed');
-  const grossRevenue = sos.filter(s => s.status !== 'Draft').reduce((sum, s) => sum + (Number(s.total) || 0), 0);
-  
-  const itemsRes = itemService?.getItems?.({}, 1, 1000) || { data: [], total: 0 };
-  const lowStockCount = itemService?.getLowStockItems?.()?.length || 0;
-  
-  const customers = salesService?.getCustomers?.() || [];
-  const arTotal = customers.reduce((sum, c) => sum + (salesService.getCustomerBalance(c.id) || 0), 0);
-  
-  const vendors = purchaseService?.getVendors?.() || [];
-  const openBills = purchaseService.getBills().filter(b => b.balanceDue > 0);
-  const apTotal = vendors.reduce((sum, v) => sum + (purchaseService.getVendorBalance(v.id) || 0), 0);
-  
-  const pendingOrders = sos.filter(s => s.status === 'Confirmed' || s.status === 'Draft').slice(0, 5);
+  const stats = useMemo(() => {
+    const sos = salesService.getSalesOrders();
+    const invs = salesService.getInvoices();
+    const receipts = salesService.getPaymentsReceived();
+    const bills = purchaseService.getBills();
+    const customers = salesService.getCustomers();
+    const vendors = purchaseService.getVendors();
+    const disbursements = purchaseService.getPaymentsMade();
 
-  const recentPayments = purchaseService.getPaymentsMade().slice(-3).reverse();
-  const recentInvoices = salesService.getInvoices().slice(-2).reverse();
+    // Core Metrics
+    const activeSos = sos.filter(s => s.status !== 'Invoiced' && s.status !== 'Closed');
+    const grossRevenue = invs.filter(i => i.status !== 'Voided').reduce((sum, i) => sum + (Number(i.total) || 0), 0);
+    const arTotal = customers.reduce((sum, c) => sum + (salesService.getCustomerBalance(c.id) || 0), 0);
+    const apTotal = vendors.reduce((sum, v) => sum + (purchaseService.getVendorBalance(v.id) || 0), 0);
+    const inventoryValue = itemService.calculateInventoryValue();
+    const lowStockCount = itemService.getLowStockItems().length;
 
-  const StatCard = ({ label, value, trend, icon, colorClass, onClick, active }: any) => (
+    // Create a unified stream of recent financial activity
+    const stream = [
+      ...invs.map(i => ({ type: 'INV', date: i.date, amount: i.total, ref: i.invoiceNumber, label: 'Sales Invoice', customer: salesService.getCustomerById(i.customerId)?.name || 'Client' })),
+      ...receipts.map(r => ({ type: 'REC', date: r.date, amount: r.amount, ref: r.paymentNumber, label: 'Payment Received', customer: salesService.getCustomerById(r.customerId)?.name || 'Client' })),
+      ...disbursements.map(d => ({ type: 'DISB', date: d.date, amount: d.amount, ref: d.paymentNumber, label: 'Vendor Payment', customer: purchaseService.getVendorById(d.vendorId)?.name || 'Supplier' }))
+    ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 6);
+
+    return {
+      activeSos,
+      grossRevenue,
+      arTotal,
+      apTotal,
+      inventoryValue,
+      lowStockCount,
+      financialStream: stream,
+      pendingOrders: sos.filter(s => s.status === 'Confirmed' || s.status === 'Draft').slice(0, 4)
+    };
+  }, []);
+
+  const StatCard = ({ label, value, subtext, trend, icon, colorClass, onClick }: any) => (
     <div 
       onClick={onClick}
-      className={`bg-white p-6 rounded-[28px] border transition-all cursor-pointer group relative overflow-hidden ${active ? 'ring-2 ring-[#fbaf0f] border-[#fbaf0f] shadow-xl' : 'border-slate-200 shadow-sm hover:shadow-md'}`}
+      className="bg-white p-6 rounded-[32px] border border-slate-200 transition-all cursor-pointer group hover:shadow-2xl hover:border-brand/30 relative overflow-hidden"
     >
       <div className="flex items-center justify-between mb-4">
-        <div className={`p-3 rounded-xl ${colorClass} bg-opacity-10 text-slate-900 group-hover:scale-110 transition-transform`}>
+        <div className={`p-3 rounded-2xl ${colorClass} bg-opacity-10 text-slate-900 group-hover:scale-110 transition-transform`}>
           {icon}
         </div>
-        <div className={`flex items-center gap-1 text-[10px] font-black uppercase tracking-widest ${trend === 'up' ? 'text-emerald-600' : 'text-red-600'}`}>
+        <div className={`flex items-center gap-1 text-[10px] font-black uppercase tracking-widest ${trend === 'up' ? 'text-emerald-600' : 'text-rose-600'}`}>
           {trend === 'up' ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-          {trend === 'up' ? 'Growth' : 'Risk'}
+          {trend === 'up' ? 'Growth' : 'Liability'}
         </div>
       </div>
       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</p>
       <h3 className="text-2xl font-black text-slate-900 tracking-tight">{value}</h3>
-      {active && <div className="absolute top-2 right-2 w-2 h-2 bg-[#fbaf0f] rounded-full animate-ping"></div>}
+      <p className="text-[10px] text-slate-500 font-bold mt-1 uppercase tracking-tighter">{subtext}</p>
     </div>
   );
 
   return (
-    <div className="space-y-6 pb-12 animate-in fade-in text-slate-900">
-      {/* Dynamic Header Banner */}
-      <div className="relative overflow-hidden bg-slate-900 rounded-[40px] p-10 shadow-2xl border border-slate-800">
-         <div className="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 bg-[#fbaf0f] rounded-full mix-blend-multiply filter blur-3xl opacity-5"></div>
-         
-         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
+    <div className="space-y-8 pb-20 animate-in fade-in duration-500 text-slate-900">
+      {/* 1. PREMIUM HERO CONSOLE */}
+      <div className="relative overflow-hidden bg-slate-900 rounded-[48px] p-10 shadow-2xl border border-white/5">
+         <div className="absolute top-0 right-0 -mr-20 -mt-20 w-[500px] h-[500px] bg-brand rounded-full mix-blend-screen filter blur-[120px] opacity-10 animate-pulse"></div>
+         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-10">
             <div className="flex items-center gap-8">
-               <div className="bg-transparent flex items-center justify-center">
-                  {settings.logoUrl ? (
-                    <img src={settings.logoUrl} alt="Org Logo" className="h-24 w-auto object-contain brightness-110 drop-shadow-[0_10px_15px_rgba(0,0,0,0.3)]" />
-                  ) : (
-                    <div className="w-20 h-20 bg-[#fbaf0f] rounded-2xl flex items-center justify-center font-black text-3xl text-slate-900 shadow-xl">K</div>
-                  )}
-               </div>
+               <div className="w-24 h-24 bg-brand rounded-[32px] flex items-center justify-center font-black text-4xl text-slate-900 shadow-[0_20px_50px_rgba(251,175,15,0.3)] transition-transform hover:rotate-3">K</div>
                <div>
-                  <h2 className="text-3xl font-black text-white tracking-tight flex items-center gap-2">
-                    System Health: <span className="text-[#fbaf0f]">Optimal</span> <Sparkles className="text-[#fbaf0f]" size={24} />
-                  </h2>
-                  <p className="text-slate-400 text-base font-medium mt-1">
-                    Managing <span className="text-white font-bold">{settings.companyName}</span> Digital Ledger.
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-4xl font-black text-white tracking-tight">KlenCare Enterprise</h2>
+                    <span className="px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded-full text-[10px] font-black uppercase tracking-widest border border-emerald-500/30 flex items-center gap-1">
+                      <ShieldCheck size={12}/> Logic Persistent
+                    </span>
+                  </div>
+                  <p className="text-slate-400 text-lg font-medium mt-2">
+                    Managed Entity: <span className="text-brand font-bold">{settings.companyName}</span>
                   </p>
                </div>
             </div>
-            <div className="flex items-center gap-4">
-               <div className="px-6 py-4 bg-white/5 rounded-3xl border border-white/10 text-center min-w-[130px]">
-                  <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Active Sales</p>
-                  <p className="text-2xl font-black text-white">{activeSos.length}</p>
+            <div className="flex flex-wrap items-center gap-4">
+               <div className="px-8 py-5 bg-white/5 rounded-[28px] border border-white/10 backdrop-blur-md">
+                  <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1">Asset Valuation</p>
+                  <p className="text-2xl font-black text-white">AED {stats.inventoryValue.toLocaleString()}</p>
                </div>
-               <div className="px-6 py-4 bg-white/5 rounded-3xl border border-white/10 text-center min-w-[130px]">
-                  <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Open Bills</p>
-                  <p className={`text-2xl font-black ${openBills.length > 0 ? 'text-rose-400' : 'text-[#fbaf0f]'}`}>{openBills.length}</p>
+               <div className="px-8 py-5 bg-brand rounded-[28px] shadow-xl shadow-amber-500/20">
+                  <p className="text-[9px] font-black text-slate-900/60 uppercase tracking-[0.2em] mb-1">Accounts Receivable</p>
+                  <p className="text-2xl font-black text-slate-900">AED {stats.arTotal.toLocaleString()}</p>
                </div>
             </div>
          </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-8">
-        <StatCard label="Receivables (AR)" value={`AED ${arTotal.toLocaleString()}`} trend="up" icon={<Wallet size={20} />} colorClass="bg-blue-600" onClick={() => navigate('/sales/invoices')} />
+      {/* 2. CORE PERFORMANCE GRID */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
-          label="Payables (AP)" 
-          value={`AED ${apTotal.toLocaleString()}`} 
-          trend={apTotal > 0 ? "down" : "up"} 
-          icon={<Truck size={20} />} 
-          colorClass="bg-rose-600" 
-          active={apTotal > 0}
-          onClick={() => setShowAPDetails(true)} 
+          label="Gross Revenue" 
+          value={`AED ${stats.grossRevenue.toLocaleString()}`} 
+          subtext="Total Tax Invoices"
+          trend="up" 
+          icon={<BarChart3 size={22} />} 
+          colorClass="bg-blue-600" 
+          onClick={() => navigate('/reports')} 
         />
-        <StatCard label="Sales Revenue" value={`AED ${grossRevenue.toLocaleString()}`} trend="up" icon={<DollarSign size={20} />} colorClass="bg-[#fbaf0f]" onClick={() => navigate('/reports')} />
-        <StatCard label="Stock Integrity" value={lowStockCount > 0 ? `${lowStockCount} Low` : 'Healthy'} trend={lowStockCount > 0 ? 'down' : 'up'} icon={<Package size={20} />} colorClass={lowStockCount > 0 ? 'bg-amber-600' : 'bg-emerald-600'} onClick={() => navigate('/inventory/dashboard')} />
+        <StatCard 
+          label="Accounts Payable" 
+          value={`AED ${stats.apTotal.toLocaleString()}`} 
+          subtext="Total Unpaid Bills"
+          trend="down" 
+          icon={<Truck size={22} />} 
+          colorClass="bg-rose-600" 
+          onClick={() => navigate('/purchases/bills')} 
+        />
+        <StatCard 
+          label="Orders In Pipeline" 
+          value={stats.activeSos.length} 
+          subtext="Awaiting Shipment"
+          trend="up" 
+          icon={<ShoppingCart size={22} />} 
+          colorClass="bg-amber-600" 
+          onClick={() => navigate('/sales/orders')} 
+        />
+        <StatCard 
+          label="Inventory Health" 
+          value={stats.lowStockCount === 0 ? 'Healthy' : `${stats.lowStockCount} Critical`} 
+          subtext="Below Reorder Points"
+          trend={stats.lowStockCount > 0 ? 'down' : 'up'} 
+          icon={<Boxes size={22} />} 
+          colorClass={stats.lowStockCount > 0 ? 'bg-rose-600' : 'bg-emerald-600'} 
+          onClick={() => navigate('/inventory/dashboard')} 
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
-          <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm">
-             <div className="flex items-center justify-between mb-8">
-                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Recent Activity Feed</h3>
-                <div className="flex items-center gap-2 px-3 py-1 bg-slate-50 rounded-full text-[10px] font-bold text-slate-400">
-                  <Clock size={12}/> Updated Just Now
+          
+          {/* CONSOLIDATED LEDGER STREAM */}
+          <div className="bg-white p-10 rounded-[40px] border border-slate-200 shadow-sm relative overflow-hidden">
+             <div className="flex items-center justify-between mb-10">
+                <div>
+                   <h3 className="text-sm font-black text-slate-900 uppercase tracking-[0.2em]">Financial Transaction Stream</h3>
+                   <p className="text-xs text-slate-400 font-medium mt-1">Live audit trail of all AR/AP movements.</p>
+                </div>
+                <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-2xl text-[10px] font-black text-slate-400 uppercase tracking-widest border border-slate-100">
+                  <Activity size={12} className="text-brand animate-pulse"/> Engine Live
                 </div>
              </div>
+             
              <div className="space-y-4">
-                {recentPayments.map(p => (
-                   <div key={p.id} className="flex items-center justify-between p-4 bg-rose-50/30 rounded-2xl border border-rose-100/50">
-                      <div className="flex items-center gap-4">
-                         <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-rose-600 shadow-sm border border-rose-100">
-                            <ArrowUpRight size={20}/>
+                {stats.financialStream.map((txn, idx) => {
+                  const isIn = txn.type === 'INV' || txn.type === 'REC';
+                  return (
+                    <div key={idx} className={`group flex items-center justify-between p-5 rounded-[24px] border transition-all ${isIn ? 'bg-emerald-50/30 border-emerald-100/50 hover:bg-emerald-50' : 'bg-rose-50/30 border-rose-100/50 hover:bg-rose-50'}`}>
+                      <div className="flex items-center gap-5">
+                         <div className={`w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm border group-hover:scale-110 transition-transform ${isIn ? 'text-emerald-600 border-emerald-100' : 'text-rose-600 border-rose-100'}`}>
+                            {isIn ? <ArrowDownRight size={24}/> : <ArrowUpRight size={24}/>}
                          </div>
                          <div>
-                            <p className="text-sm font-bold text-slate-900">Vendor Disbursement</p>
-                            <p className="text-[10px] text-slate-500 font-black uppercase">{p.paymentMode} • Ref: {p.reference || p.paymentNumber}</p>
+                            <p className="text-sm font-black text-slate-900">{txn.label}: {txn.ref}</p>
+                            <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">{txn.customer}</p>
                          </div>
                       </div>
                       <div className="text-right">
-                         <p className="text-sm font-black text-rose-600">- AED {p.amount.toLocaleString()}</p>
-                         <p className="text-[10px] text-slate-400 font-bold">{new Date(p.date).toLocaleDateString()}</p>
+                         <p className={`text-base font-black ${isIn ? 'text-emerald-600' : 'text-rose-600'}`}>
+                           {isIn ? '+' : '-'} AED {Number(txn.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                         </p>
+                         <p className="text-[10px] text-slate-400 font-bold uppercase">{new Date(txn.date).toLocaleDateString()}</p>
                       </div>
-                   </div>
-                ))}
-                {recentInvoices.map(inv => (
-                   <div key={inv.id} className="flex items-center justify-between p-4 bg-emerald-50/30 rounded-2xl border border-emerald-100/50">
-                      <div className="flex items-center gap-4">
-                         <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-emerald-600 shadow-sm border border-emerald-100">
-                            <ArrowDownRight size={20}/>
-                         </div>
-                         <div>
-                            <p className="text-sm font-bold text-slate-900">Tax Invoice Issued</p>
-                            <p className="text-[10px] text-slate-500 font-black uppercase">{inv.invoiceNumber}</p>
-                         </div>
-                      </div>
-                      <div className="text-right">
-                         <p className="text-sm font-black text-emerald-600">+ AED {inv.total.toLocaleString()}</p>
-                         <p className="text-[10px] text-slate-400 font-bold">{new Date(inv.date).toLocaleDateString()}</p>
-                      </div>
-                   </div>
-                ))}
+                    </div>
+                  );
+                })}
+                
+                {stats.financialStream.length === 0 && (
+                   <div className="py-20 text-center text-slate-400 italic font-medium">System initialized. Awaiting transactions...</div>
+                )}
              </div>
           </div>
 
-          <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm">
-            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-6">Fulfillment Queue</h3>
+          {/* FULFILLMENT QUEUE */}
+          <div className="bg-white p-10 rounded-[40px] border border-slate-200 shadow-sm">
+            <div className="flex items-center justify-between mb-8">
+               <h3 className="text-sm font-black text-slate-900 uppercase tracking-[0.2em]">Fulfillment Queue</h3>
+               <button onClick={() => navigate('/sales/orders')} className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-1 hover:gap-2 transition-all">View All <ArrowRight size={14}/></button>
+            </div>
+            
             <div className="space-y-3">
-              {pendingOrders.map((order) => {
-                const cust = salesService.getCustomerById(order.customerId);
-                return (
-                  <div key={order.id} className="flex items-center justify-between p-4 hover:bg-slate-50 rounded-2xl transition-all border border-transparent hover:border-slate-100 group">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-slate-100 rounded-[18px] flex items-center justify-center font-black text-slate-400 text-xs uppercase">SO</div>
-                      <div>
-                        <p className="text-sm font-bold text-slate-900 group-hover:text-[#fbaf0f] transition-colors">{order.orderNumber}</p>
-                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{cust?.name || 'Client Unresolved'}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                       <span className={`text-[9px] font-black px-2 py-1 rounded-lg border ${order.status === 'Confirmed' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>{order.status.toUpperCase()}</span>
-                       <button onClick={() => navigate(`/sales/orders/${order.id}`)} className="p-2 text-slate-300 group-hover:text-amber-500 transition-all"><ChevronRight size={20} /></button>
+              {stats.pendingOrders.map((order) => (
+                <div key={order.id} className="flex items-center justify-between p-5 hover:bg-slate-50 rounded-[24px] transition-all border border-transparent hover:border-slate-100 group cursor-pointer" onClick={() => navigate(`/sales/orders/${order.id}`)}>
+                  <div className="flex items-center gap-5">
+                    <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center font-black text-slate-400 text-xs uppercase group-hover:bg-blue-50 group-hover:text-blue-500 transition-colors">SO</div>
+                    <div>
+                      <p className="text-sm font-black text-slate-900">{order.orderNumber}</p>
+                      <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{salesService.getCustomerById(order.customerId)?.name || 'Client'}</p>
                     </div>
                   </div>
-                );
-              })}
+                  <div className="flex items-center gap-6">
+                     <span className={`text-[9px] font-black px-3 py-1.5 rounded-xl border ${order.status === 'Confirmed' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>{order.status.toUpperCase()}</span>
+                     <button className="p-3 text-slate-300 group-hover:text-brand transition-all"><ChevronRight size={24} /></button>
+                  </div>
+                </div>
+              ))}
+              {stats.pendingOrders.length === 0 && (
+                 <div className="py-12 bg-slate-50 rounded-[32px] border border-dashed border-slate-200 text-center text-slate-400 text-sm italic">No pending orders.</div>
+              )}
             </div>
           </div>
         </div>
 
         <div className="space-y-8">
-          <div className="bg-slate-900 p-8 rounded-[32px] shadow-2xl text-white">
-            <h3 className="text-xs font-black text-[#fbaf0f] uppercase tracking-widest mb-6 flex items-center gap-2">
-              <Clock size={16} />
-              Operational Shortcuts
+          {/* RAPID ACTION SIDEBAR */}
+          <div className="bg-slate-900 p-10 rounded-[40px] shadow-2xl text-white">
+            <h3 className="text-xs font-black text-brand uppercase tracking-[0.2em] mb-8 flex items-center gap-2">
+              <Clock size={16} /> Rapid Deployment
             </h3>
             <div className="grid grid-cols-2 gap-4">
-              {[
-                { label: 'Sales Order', path: '/sales/orders/new' },
-                { label: 'Record Bill', path: '/purchases/bills/new' },
-                { label: 'Quick Receipt', path: '/sales/payments/new' },
-                { label: 'EOM Audit', path: '/reports' }
-              ].map(link => (
-                <button key={link.label} onClick={() => navigate(link.path)} className="py-4 px-4 bg-slate-800 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-[#fbaf0f] hover:text-slate-900 transition-all shadow-lg active:scale-95">
-                  {link.label}
-                </button>
-              ))}
+              <button onClick={() => navigate('/sales/orders/new')} className="flex flex-col items-center gap-3 py-6 bg-white/5 rounded-[24px] text-[10px] font-black uppercase tracking-widest border border-white/10 hover:bg-blue-600 transition-all">
+                <ShoppingCart size={18}/> Orders
+              </button>
+              <button onClick={() => navigate('/sales/invoices/new')} className="flex flex-col items-center gap-3 py-6 bg-white/5 rounded-[24px] text-[10px] font-black uppercase tracking-widest border border-white/10 hover:bg-indigo-600 transition-all">
+                <Receipt size={18}/> Invoice
+              </button>
+              <button onClick={() => navigate('/sales/statements')} className="flex flex-col items-center gap-3 py-6 bg-white/5 rounded-[24px] text-[10px] font-black uppercase tracking-widest border border-white/10 hover:bg-amber-600 transition-all">
+                <FileText size={18}/> Statements
+              </button>
+              <button onClick={() => navigate('/purchases/payments/new')} className="flex flex-col items-center gap-3 py-6 bg-white/5 rounded-[24px] text-[10px] font-black uppercase tracking-widest border border-white/10 hover:bg-rose-600 transition-all">
+                <HandCoins size={18}/> Record Pay
+              </button>
             </div>
           </div>
 
-          {/* Admin Management Widget */}
-          {user?.role === 'Admin' && (
-            <div className="bg-[#fbaf0f] p-8 rounded-[32px] shadow-xl text-slate-900 relative overflow-hidden group cursor-pointer" onClick={() => navigate('/admin/team')}>
-              <div className="absolute top-0 right-0 -mr-8 -mt-8 w-24 h-24 bg-white/20 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
-              <UserCheck size={32} className="mb-4" />
-              <h3 className="text-lg font-black tracking-tight mb-1">Team Access Control</h3>
-              <p className="text-xs font-bold text-slate-800 uppercase tracking-widest">Generate Team Credentials</p>
-              <div className="mt-6 flex items-center gap-2 text-[10px] font-black uppercase">
-                Manage Organization <ChevronRight size={14} />
-              </div>
-            </div>
-          )}
-
-          <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm">
+          {/* STOCK STATUS WIDGET */}
+          <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm">
              <div className="flex items-center gap-3 mb-6">
-                <ShieldCheck size={20} className="text-brand" />
-                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Regulatory Status</h3>
+                <div className="p-3 bg-rose-50 text-rose-600 rounded-2xl">
+                   <AlertCircle size={24} />
+                </div>
+                <div>
+                   <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Inventory Status</h3>
+                   <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Stock Criticality</p>
+                </div>
              </div>
              <div className="space-y-4">
-                <div className="flex justify-between items-center py-2 border-b border-slate-50">
-                   <span className="text-xs text-slate-500 font-medium">TRN Validation</span>
-                   <span className="text-[10px] font-black uppercase text-emerald-600 px-2 bg-emerald-50 rounded-full">Active</span>
+                <div className="flex justify-between items-end mb-2">
+                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Storage Capacity</p>
+                   <p className="text-xs font-black text-slate-900">72%</p>
                 </div>
-                <div className="flex justify-between items-center py-2 border-b border-slate-50">
-                   <span className="text-xs text-slate-500 font-medium">VAT Period</span>
-                   <span className="text-[10px] font-black uppercase text-blue-600 px-2 bg-blue-50 rounded-full">Current</span>
+                <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                   <div className="h-full bg-brand w-[72%] rounded-full shadow-[0_0_10px_rgba(251,175,15,0.4)]"></div>
                 </div>
                 <button 
-                  onClick={() => navigate('/sales/statements')}
-                  className="w-full mt-4 py-3.5 bg-[#fbaf0f] text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-amber-100 hover:bg-brandDark transition-all active:scale-95"
+                  onClick={() => navigate('/inventory/dashboard')}
+                  className="w-full mt-4 py-4 bg-slate-900 text-white rounded-[20px] text-[10px] font-black uppercase tracking-[0.2em] hover:bg-slate-800 transition-all"
                 >
-                  Generate EOM Statements
+                  Manage Stock
                 </button>
              </div>
           </div>
         </div>
       </div>
-
-      {/* AP Drilldown Side Panel */}
-      {showAPDetails && (
-         <div className="fixed inset-0 z-[100] flex justify-end">
-            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowAPDetails(false)}></div>
-            <div className="relative w-full max-w-md bg-white h-full shadow-2xl animate-in slide-in-from-right duration-300 flex flex-col">
-               <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                  <div className="flex items-center gap-4">
-                     <div className="p-3 bg-rose-50 text-rose-600 rounded-2xl"><Truck size={24}/></div>
-                     <div>
-                        <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">Payables Ledger</h3>
-                        <p className="text-xs text-slate-500 font-medium">Open Vendor Liabilities</p>
-                     </div>
-                  </div>
-                  <button onClick={() => setShowAPDetails(false)} className="p-2.5 text-slate-400 hover:text-rose-500 transition-colors bg-white rounded-xl shadow-sm"><X size={20} /></button>
-               </div>
-               
-               <div className="flex-1 overflow-y-auto p-8 space-y-6">
-                  {openBills.length > 0 ? openBills.map(bill => {
-                     const vendor = purchaseService.getVendorById(bill.vendorId);
-                     return (
-                        <div key={bill.id} className="p-6 border border-slate-100 rounded-[28px] hover:border-rose-200 transition-all bg-white shadow-sm group">
-                           <div className="flex justify-between items-start mb-4">
-                              <div>
-                                 <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest">Bill No: {bill.billNumber}</p>
-                                 <p className="text-sm font-bold text-slate-900 mt-1">{vendor?.name}</p>
-                              </div>
-                              <span className="px-2 py-1 bg-amber-50 text-amber-700 text-[9px] font-black uppercase rounded-lg">Due: {new Date(bill.dueDate).toLocaleDateString()}</span>
-                           </div>
-                           <div className="flex justify-between items-end">
-                              <div>
-                                 <p className="text-[10px] text-slate-400 font-bold uppercase">Balance Due</p>
-                                 <p className="text-xl font-black text-slate-900">AED {bill.balanceDue.toLocaleString()}</p>
-                              </div>
-                              <button 
-                                onClick={() => { setShowAPDetails(false); navigate(`/purchases/payments/new?billId=${bill.id}&vendorId=${bill.vendorId}`); }}
-                                className="p-2.5 bg-slate-900 text-white rounded-xl hover:bg-[#fbaf0f] hover:text-slate-900 transition-all"
-                              >
-                                 <ArrowUpRight size={18} />
-                              </button>
-                           </div>
-                        </div>
-                     );
-                  }) : (
-                     <div className="text-center py-20">
-                        <div className="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-[32px] flex items-center justify-center mx-auto mb-6">
-                           <CheckCircle2 size={40}/>
-                        </div>
-                        <h4 className="text-lg font-black text-slate-900">Ledger Balanced</h4>
-                        <p className="text-sm text-slate-500 mt-2">All vendor bills have been fully paid.</p>
-                     </div>
-                  )}
-               </div>
-               
-               <div className="p-8 bg-slate-50 border-t border-slate-100">
-                  <div className="flex justify-between items-center mb-6">
-                     <p className="text-sm font-black text-slate-400 uppercase tracking-widest">Total Liability</p>
-                     <p className="text-2xl font-black text-rose-600">AED {apTotal.toLocaleString()}</p>
-                  </div>
-                  <button 
-                    onClick={() => { setShowAPDetails(false); navigate('/purchases/payments/new'); }}
-                    className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl hover:bg-slate-800 transition-all active:scale-95"
-                  >
-                     New General Disbursement
-                  </button>
-               </div>
-            </div>
-         </div>
-      )}
     </div>
   );
 };

@@ -20,10 +20,11 @@ export default function Assemblies() {
   const items = itemService.getItems({ status: 'Active' }, 1, 999).data;
   const warehouses = itemService.getWarehouses();
 
-  const handleBuild = () => {
+  // FIX: handleBuild is now async to properly await the asynchronous service logic
+  const handleBuild = async () => {
     if (!selectedAssyId) return;
     try {
-      itemService.buildAssembly(selectedAssyId, warehouseId, buildQty, user);
+      await itemService.buildAssembly(selectedAssyId, warehouseId, buildQty, user);
       alert('Build successful! Ledger entries created.');
       setActiveTab('list');
     } catch (err: any) {

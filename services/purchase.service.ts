@@ -1,130 +1,69 @@
-import { Vendor, PurchaseOrder, Bill, PaymentMade, GoodsReceive } from '../types';
-import { auditService } from './audit.service';
+
+import { Vendor, PurchaseOrder, Bill, PaymentMade, GoodsReceive, User } from '../types';
 import { itemService } from './item.service';
+import { apiRequest } from './api';
 
 class PurchaseService {
   private vendors: Vendor[] = [];
-  private pos: PurchaseOrder[] = [];
   private bills: Bill[] = [];
-  private payments: PaymentMade[] = [];
+  private purchaseOrders: PurchaseOrder[] = [];
+  private paymentsMade: PaymentMade[] = [];
   private receives: GoodsReceive[] = [];
 
   constructor() {
-    this.loadData();
+    this.refresh();
   }
 
-  private loadData() {
-    const data = [
-      { key: 'klencare_vendors', ref: 'vendors' },
-      { key: 'klencare_pos', ref: 'pos' },
-      { key: 'klencare_bills', ref: 'bills' },
-      { key: 'klencare_payments_made', ref: 'payments' },
-      { key: 'klencare_receives', ref: 'receives' },
-    ];
+  async refresh() {
+    try {
+      const results = await Promise.allSettled([
+        apiRequest('GET', '/api/vendors'),
+        apiRequest('GET', '/api/bills'),
+        apiRequest('GET', '/api/purchase_orders'),
+        apiRequest('GET', '/api/payments_made'),
+        apiRequest('GET', '/api/receives')
+      ]);
 
-    data.forEach(d => {
-      const stored = localStorage.getItem(d.key);
-      if (stored) (this as any)[d.ref] = JSON.parse(stored);
-    });
-
-    if (this.vendors.length === 0) {
-      this.seedData();
+      if (results[0].status === 'fulfilled') this.vendors = results[0].value;
+      if (results[1].status === 'fulfilled') this.bills = results[1].value;
+      if (results[2].status === 'fulfilled') this.purchaseOrders = results[2].value;
+      if (results[3].status === 'fulfilled') this.paymentsMade = results[3].value;
+      if (results[4].status === 'fulfilled') this.receives = results[4].value;
+    } catch (e) {
+      console.error("Purchase Sync Failed", e);
     }
   }
 
-  private seedData() {
-    this.vendors = [
-      { 
-        id: 'VND-01', 
-        name: 'Elite Supplies', 
-        companyName: 'Elite General Trading LLC', 
-        email: 'orders@elite.ae', 
-        phone: '+971 4 111 2222', 
-        mobile: '+971 50 999 8888',
-        website: 'https://elite-supplies.ae',
-        currency: 'AED', 
-        trn: '100012345600003',
-        address: 'Warehouse 12, Jebel Ali Freezone, Dubai', 
-        billingAddress: 'Warehouse 12, Jebel Ali Freezone, Dubai',
-        shippingAddress: 'Warehouse 12, Jebel Ali Freezone, Dubai',
-        status: 'Active', 
-        createdAt: new Date().toISOString() 
-      }
-    ];
+  getVendors() { return this.vendors; }
+  getVendorById(id: string) { return this.vendors.find(v => v.id === id); }
+  getBills() { return this.bills; }
+  getPurchaseOrders() { return this.purchaseOrders; }
+  getPOById(id: string) { return this.purchaseOrders.find(po => po.id === id); }
+  getPaymentsMade() { return this.paymentsMade; }
+  getReceives() { return this.receives; }
 
-    this.bills = [
-      {
-        id: 'BIL-SEED-01',
-        billNumber: 'BIL-2024-001',
-        vendorId: 'VND-01',
-        date: new Date().toISOString(),
-        dueDate: new Date(Date.now() + 15 * 86400000).toISOString(),
-        total: 1250.00,
-        balanceDue: 1250.00,
-        status: 'Open'
-      }
-    ];
-
-    this.saveData();
+  async createVendor(data: any, user: User | null) {
+    const nv = { ...data, id: `VND-${Date.now()}`, status: 'Active', createdAt: new Date().toISOString() };
+    await apiRequest('POST', '/api/vendors', nv);
+    await this.refresh();
+    return nv;
   }
 
-  private saveData() {
-    localStorage.setItem('klencare_vendors', JSON.stringify(this.vendors));
-    localStorage.setItem('klencare_pos', JSON.stringify(this.pos));
-    localStorage.setItem('klencare_bills', JSON.stringify(this.bills));
-    localStorage.setItem('klencare_payments_made', JSON.stringify(this.payments));
-    localStorage.setItem('klencare_receives', JSON.stringify(this.receives));
+  async findOrCreateVendor(name: string, user: User | null) {
+    let v = this.vendors.find(v => v.name.toLowerCase() === name.toLowerCase());
+    if (!v) v = await this.createVendor({ name, companyName: name, currency: 'AED' }, user);
+    return v;
   }
 
-  getVendors(filters: any = {}) {
-    let filtered = [...this.vendors];
-    if (filters.search) {
-      const s = filters.search.toLowerCase();
-      filtered = filtered.filter(v => v.name.toLowerCase().includes(s) || v.companyName.toLowerCase().includes(s) || (v.trn && v.trn.includes(s)));
-    }
-    return filtered;
+  async updateVendor(id: string, data: any, user: User | null) {
+    const updated = { ...data, id };
+    await apiRequest('POST', '/api/vendors', updated);
+    await this.refresh();
   }
 
-  getVendorById(id: string) {
-    return this.vendors.find(v => v.id === id);
-  }
-
-  findOrCreateVendor(name: string, user: any) {
-    let vendor = this.vendors.find(v => v.name === name);
-    if (!vendor) {
-      vendor = this.createVendor({ name, companyName: name, email: '', phone: '', currency: 'AED', address: '', status: 'Active' }, user);
-    }
-    return vendor;
-  }
-
-  createVendor(data: any, user: any) {
-    const newV: Vendor = {
-      ...data,
-      id: `VND-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
-      createdAt: new Date().toISOString()
-    };
-    this.vendors.push(newV);
-    this.saveData();
-    if (user) auditService.log(user, 'CREATE', 'VENDOR', newV.id, `Created vendor ${newV.name}`);
-    return newV;
-  }
-
-  updateVendor(id: string, data: any, user: any) {
-    const idx = this.vendors.findIndex(v => v.id === id);
-    if (idx !== -1) {
-      this.vendors[idx] = { ...this.vendors[idx], ...data };
-      this.saveData();
-      if (user) auditService.log(user, 'UPDATE', 'VENDOR', id, `Updated vendor ${this.vendors[idx].name}`);
-      return this.vendors[idx];
-    }
-    return null;
-  }
-
-  deleteVendor(id: string, user: any) {
-    const v = this.getVendorById(id);
-    this.vendors = this.vendors.filter(v => v.id !== id);
-    this.saveData();
-    if (v && user) auditService.log(user, 'DELETE', 'VENDOR', id, `Deleted vendor ${v.name}`);
+  async deleteVendor(id: string, user: User) {
+    await apiRequest('DELETE', `/api/vendors/${id}`);
+    await this.refresh();
   }
 
   getVendorBalance(vendorId: string) {
@@ -133,157 +72,100 @@ class PurchaseService {
       .reduce((sum, b) => sum + (Number(b.balanceDue) || 0), 0);
   }
 
-  getPurchaseOrders() { return this.pos; }
-  getPOById(id: string) { return this.pos.find(po => po.id === id); }
-
-  createPO(data: any, user: any) {
-    const newPO: PurchaseOrder = {
-      ...data,
-      id: `PO-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
-      poNumber: data.poNumber || `PO-${Date.now().toString().slice(-5)}`,
-      status: 'Draft',
-      date: data.date || new Date().toISOString()
-    };
-    this.pos.push(newPO);
-    this.saveData();
-    return newPO;
+  async createPO(data: any, user: User | null) {
+    const npo = { ...data, id: `PO-${Date.now()}`, poNumber: data.poNumber || `PO-${Date.now().toString().slice(-4)}`, status: 'Issued' };
+    await apiRequest('POST', '/api/purchase_orders', npo);
+    await this.refresh();
+    return npo;
   }
 
-  updatePOStatus(id: string, status: string, user: any) {
-    const idx = this.pos.findIndex(p => p.id === id);
-    if (idx !== -1) {
-      this.pos[idx].status = status as any;
-      this.saveData();
-      if (user) auditService.log(user, 'UPDATE', 'PURCHASE_ORDER', id, `Updated PO status to ${status}`);
+  async updatePOStatus(id: string, status: string, user: User | null) {
+    const po = this.getPOById(id);
+    if (po) {
+      po.status = status as any;
+      await apiRequest('POST', '/api/purchase_orders', po);
+      await this.refresh();
     }
   }
 
-  getReceives() { return this.receives; }
-
-  createGRN(data: any, user: any) {
-    const grn: GoodsReceive = {
-      ...data,
-      id: `GRN-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
-      receiveNo: data.receiveNo || `GRN-${Date.now().toString().slice(-5)}`,
-      status: 'Received',
-      date: data.date || new Date().toISOString()
-    };
-
-    grn.lines.forEach((line: any) => {
-      itemService.addStockMove({
+  async createGRN(data: any, user: User | null) {
+    const grn = { ...data, id: `GRN-${Date.now()}`, status: 'Received' };
+    await apiRequest('POST', '/api/receives', grn);
+    
+    for (const line of grn.lines) {
+      await itemService.addStockMove({
         itemId: line.itemId,
-        warehouseId: data.warehouseId || 'WH01',
+        warehouseId: grn.warehouseId || 'WH01',
         refType: 'GRN',
         refNo: grn.receiveNo,
         inQty: Number(line.quantity),
-        outQty: 0,
-        note: `Goods Receipt: ${grn.receiveNo}`
+        note: `Manual Receipt via GRN`
       });
-    });
-
-    this.receives.push(grn);
-    this.saveData();
-    if (user) auditService.log(user, 'RECEIVE', 'GOODS_RECEIVE', grn.id, `Posted GRN ${grn.receiveNo}`);
+    }
+    await this.refresh();
     return grn;
   }
 
-  receivePO(poId: string, warehouseId: string, user: any) {
+  async receivePO(poId: string, warehouseId: string, user: User | null) {
     const po = this.getPOById(poId);
-    if (!po) throw new Error("PO not found");
-    
-    const grn = this.createGRN({
+    if (!po) throw new Error("PO Missing");
+    await this.createGRN({
+      receiveNo: `REC-${po.poNumber}`,
       vendorId: po.vendorId,
       warehouseId,
+      date: new Date().toISOString(),
       total: po.total,
-      lines: po.lines.map(l => ({ ...l, unitCost: l.rate })),
-      notes: `Received from ${po.poNumber}`
+      lines: po.lines.map(l => ({ ...l, quantity: l.quantity, unitCost: l.rate }))
     }, user);
-    
-    this.updatePOStatus(poId, 'Received', user);
-    return grn;
+    await this.updatePOStatus(poId, 'Received', user);
   }
 
-  // Added createBillFromPO method to fix error in PurchaseOrderDetail.tsx
-  createBillFromPO(poId: string, user: any) {
+  async createBill(data: any, user: User | null) {
+    const nb = { ...data, id: `BIL-${Date.now()}`, balanceDue: Number(data.total), status: 'Open' };
+    await apiRequest('POST', '/api/bills', nb);
+    if (data.poId) await this.updatePOStatus(data.poId, 'Billed', user);
+    if (data.lines) {
+      for (const line of data.lines) {
+        await itemService.addStockMove({
+          itemId: line.itemId,
+          refType: 'PURCHASE',
+          refNo: nb.billNumber,
+          inQty: Number(line.quantity),
+          note: `Auto-Inbound via Bill`
+        });
+      }
+    }
+    await this.refresh();
+    return nb;
+  }
+
+  async createBillFromPO(poId: string, user: User | null) {
     const po = this.getPOById(poId);
-    if (!po) throw new Error("PO not found");
-    
-    const bill = this.createBill({
+    if (!po) throw new Error("PO Missing");
+    await this.createBill({
+      billNumber: `BIL-${po.poNumber}`,
       poId: po.id,
       vendorId: po.vendorId,
       date: new Date().toISOString(),
-      dueDate: new Date(Date.now() + 30 * 86400000).toISOString(),
+      dueDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
       total: po.total,
-      billNumber: `BIL-PO-${po.poNumber}`
+      lines: po.lines
     }, user);
-    
-    this.updatePOStatus(poId, 'Billed', user);
-    return bill;
   }
 
-  getBills() { return this.bills; }
-
-  createBill(data: any, user: any) {
-    const bill: Bill = {
-      ...data,
-      id: `BIL-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
-      billNumber: data.billNumber || `BIL-${Date.now().toString().slice(-5)}`,
-      status: 'Open',
-      balanceDue: Number(data.total)
-    };
-    this.bills.push(bill);
-    this.saveData();
-    if (user) auditService.log(user, 'CREATE', 'BILL', bill.id, `Created Bill ${bill.billNumber}`);
-    return bill;
-  }
-
-  getPaymentsMade() { return this.payments; }
-
-  recordPayment(data: any, user: any) {
-    const payment: PaymentMade = {
-      ...data,
-      id: `PMT-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
-      date: data.date || new Date().toISOString(),
-      amount: Number(data.amount)
-    };
-
-    let remainingToAllocate = payment.amount;
-
-    // 1. If a specific Bill ID is provided, pay that first
-    if (payment.billId) {
-      const idx = this.bills.findIndex(b => b.id === payment.billId);
-      if (idx !== -1) {
-        const allocated = Math.min(this.bills[idx].balanceDue, remainingToAllocate);
-        this.bills[idx].balanceDue = Math.max(0, this.bills[idx].balanceDue - allocated);
-        remainingToAllocate -= allocated;
-        
-        if (this.bills[idx].balanceDue <= 0) this.bills[idx].status = 'Paid';
-        else this.bills[idx].status = 'Partially Paid';
+  async recordPayment(data: any, user: User | null) {
+    const pay = { ...data, id: `VPAY-${Date.now()}`, amount: Number(data.amount) };
+    await apiRequest('POST', '/api/payments_made', pay);
+    if (data.billId) {
+      const bill = this.bills.find(b => b.id === data.billId);
+      if (bill) {
+        bill.balanceDue = Math.max(0, Number(bill.balanceDue) - Number(data.amount));
+        bill.status = bill.balanceDue <= 0 ? 'Paid' : 'Partially Paid';
+        await apiRequest('POST', '/api/bills', bill);
       }
     }
-
-    // 2. FIFO AUTO-ALLOCATION: If there is still money left (or no billId was selected), 
-    // find other open bills for this vendor and close them out.
-    if (remainingToAllocate > 0) {
-      const vendorBills = this.bills
-        .filter(b => b.vendorId === payment.vendorId && b.balanceDue > 0)
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-      for (const bill of vendorBills) {
-        if (remainingToAllocate <= 0) break;
-        const allocated = Math.min(bill.balanceDue, remainingToAllocate);
-        bill.balanceDue = Number((bill.balanceDue - allocated).toFixed(2));
-        remainingToAllocate = Number((remainingToAllocate - allocated).toFixed(2));
-        
-        if (bill.balanceDue <= 0) bill.status = 'Paid';
-        else bill.status = 'Partially Paid';
-      }
-    }
-
-    this.payments.push(payment);
-    this.saveData();
-    if (user) auditService.log(user, 'CREATE', 'PAYMENT_MADE', payment.id, `Recorded ${payment.paymentMode} payment of AED ${payment.amount} to Vendor`);
-    return payment;
+    await this.refresh();
+    return pay;
   }
 }
 

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
@@ -10,6 +9,7 @@ import { useAuth } from '../../App';
 import { itemService } from '../../services/item.service';
 import { purchaseService } from '../../services/purchase.service';
 
+// FIXED: Moved outside to prevent re-creation/refocus on every keystroke
 const SectionHeader = ({ icon, title, desc }: any) => (
   <div className="mb-8 border-b border-slate-100 pb-4">
     <div className="flex items-center gap-3 mb-1">
@@ -117,7 +117,6 @@ export default function ItemForm() {
       )}
 
       <div className="flex flex-col lg:flex-row gap-8">
-        {/* Navigation Sidebar */}
         <div className="w-full lg:w-64 shrink-0 space-y-2">
           {[
             { id: 'basic', label: 'Primary Info', icon: <Info size={16}/> },
@@ -144,10 +143,8 @@ export default function ItemForm() {
           ))}
         </div>
 
-        {/* Form Container */}
         <div className="flex-1 bg-white rounded-[32px] border border-slate-200 shadow-sm p-10 min-h-[600px]">
           <form onSubmit={handleSubmit} id="item-form" className="space-y-12">
-            
             {activeTab === 'basic' && (
               <div className="space-y-8 animate-in fade-in duration-300">
                 <SectionHeader icon={<Package/>} title="Item Identity" desc="Core details used for identification and grouping." />
@@ -197,7 +194,6 @@ export default function ItemForm() {
                 <SectionHeader icon={<Tag/>} title="Commercial Terms" desc="Configure pricing, tax, and procurement preferences." />
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                   {/* Sales Section */}
                    <div className="p-8 bg-blue-50/50 rounded-3xl border border-blue-100 space-y-6">
                       <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2"> <Tag size={12}/> Sales Configuration </h4>
                       <InputWrapper label="Selling Price" required>
@@ -211,10 +207,9 @@ export default function ItemForm() {
                       </InputWrapper>
                    </div>
 
-                   {/* Purchase Section */}
                    <div className="p-8 bg-rose-50/30 rounded-3xl border border-rose-100 space-y-6">
                       <h4 className="text-[10px] font-black text-rose-600 uppercase tracking-widest flex items-center gap-2"> <ShoppingCart size={12}/> Procurement Configuration </h4>
-                      <InputWrapper label="Purchase Rate (Cost)" required>
+                      <InputWrapper label="Purchase Rate (Cost Price)" required>
                         <div className="relative">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">AED</span>
                           <input type="number" step="0.01" value={formData.purchasePrice} onChange={e => setFormData({...formData, purchasePrice: e.target.value})} className="w-full pl-12 pr-4 py-3 border rounded-xl outline-none font-black text-rose-600 text-lg focus:ring-4 focus:ring-rose-100" />
@@ -273,10 +268,10 @@ export default function ItemForm() {
                     <h4 className="text-[10px] font-black text-amber-600 uppercase tracking-widest">Stock Control Limits</h4>
                     <div className="grid grid-cols-2 gap-4">
                       <InputWrapper label="Reorder Level">
-                        <input type="number" value={formData.reorderLevel} onChange={e => setFormData({...formData, reorderLevel: e.target.value})} className="w-full px-4 py-3 border rounded-xl outline-none font-bold text-amber-700" />
+                        <input type="number" value={formData.reorderLevel} onChange={e => setFormData({...formData, reorderLevel: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none font-bold text-amber-700" />
                       </InputWrapper>
                       <InputWrapper label="Reorder Quantity">
-                        <input type="number" value={formData.reorderQty} onChange={e => setFormData({...formData, reorderQty: e.target.value})} className="w-full px-4 py-3 border rounded-xl outline-none font-bold text-blue-600" />
+                        <input type="number" value={formData.reorderQty} onChange={e => setFormData({...formData, reorderQty: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none font-bold text-blue-600" />
                       </InputWrapper>
                     </div>
                   </div>
@@ -292,11 +287,11 @@ export default function ItemForm() {
                   <InputWrapper label="Barcode / UPC">
                     <div className="relative">
                       <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                      <input value={formData.barcode} onChange={e => setFormData({...formData, barcode: e.target.value})} className="w-full pl-10 pr-4 py-3 border rounded-xl outline-none font-mono" placeholder="Scan or enter code..." />
+                      <input value={formData.barcode} onChange={e => setFormData({...formData, barcode: e.target.value})} className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl outline-none font-mono" placeholder="Scan or enter code..." />
                     </div>
                   </InputWrapper>
                   <InputWrapper label="HSN / SAC Code">
-                    <input value={formData.hsnSac} onChange={e => setFormData({...formData, hsnSac: e.target.value})} className="w-full px-4 py-3 border rounded-xl outline-none" placeholder="Harmonized System Code" />
+                    <input value={formData.hsnSac} onChange={e => setFormData({...formData, hsnSac: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none" placeholder="Harmonized System Code" />
                   </InputWrapper>
                   <InputWrapper label="Weight">
                     <div className="flex">
@@ -314,16 +309,16 @@ export default function ItemForm() {
                   <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2"> <Ruler size={14}/> Dimensions (L x W x H) </h4>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                     <InputWrapper label="Length">
-                      <input type="number" value={formData.length} onChange={e => setFormData({...formData, length: e.target.value})} className="w-full px-4 py-3 border rounded-xl outline-none font-bold" />
+                      <input type="number" value={formData.length} onChange={e => setFormData({...formData, length: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none font-bold" />
                     </InputWrapper>
                     <InputWrapper label="Width">
-                      <input type="number" value={formData.width} onChange={e => setFormData({...formData, width: e.target.value})} className="w-full px-4 py-3 border rounded-xl outline-none font-bold" />
+                      <input type="number" value={formData.width} onChange={e => setFormData({...formData, width: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none font-bold" />
                     </InputWrapper>
                     <InputWrapper label="Height">
-                      <input type="number" value={formData.height} onChange={e => setFormData({...formData, height: e.target.value})} className="w-full px-4 py-3 border rounded-xl outline-none font-bold" />
+                      <input type="number" value={formData.height} onChange={e => setFormData({...formData, height: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none font-bold" />
                     </InputWrapper>
                     <InputWrapper label="Dimension Unit">
-                      <select value={formData.dimensionUnit} onChange={e => setFormData({...formData, dimensionUnit: e.target.value})} className="w-full px-4 py-3 border rounded-xl outline-none bg-white font-black uppercase text-xs">
+                      <select value={formData.dimensionUnit} onChange={e => setFormData({...formData, dimensionUnit: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none bg-white font-black uppercase text-xs">
                         <option value="cm">cm</option>
                         <option value="in">in</option>
                         <option value="mm">mm</option>

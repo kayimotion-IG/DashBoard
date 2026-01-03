@@ -24,7 +24,8 @@ export default function DeliveryChallanForm() {
   const removeLine = (id: string) => setLines(lines.filter(l => l.id !== id));
   const updateLine = (id: string, field: string, val: any) => setLines(lines.map(l => l.id === id ? { ...l, [field]: val } : l));
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Fix: Added async and await for createDelivery to ensure stock deduction and persistence are completed before navigation.
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.customerId || lines.some(l => !l.itemId)) return;
 
@@ -39,8 +40,12 @@ export default function DeliveryChallanForm() {
       }
     }
 
-    salesService.createDelivery({ ...formData, lines }, user);
-    navigate('/sales/delivery-challans');
+    try {
+      await salesService.createDelivery({ ...formData, lines }, user);
+      navigate('/sales/delivery-challans');
+    } catch (err: any) {
+      alert(err.message || 'Failed to create Delivery Challan');
+    }
   };
 
   return (

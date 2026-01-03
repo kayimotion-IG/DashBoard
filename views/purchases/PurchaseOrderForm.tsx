@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -53,21 +52,22 @@ export default function PurchaseOrderForm() {
 
   const total = lines.reduce((sum, l) => sum + l.total, 0);
 
-  const handleSubmit = (e?: React.FormEvent, shouldIssue: boolean = false) => {
+  // Added async to handleSubmit and await for asynchronous service calls
+  const handleSubmit = async (e?: React.FormEvent, shouldIssue: boolean = false) => {
     if (e) e.preventDefault();
     if (!formData.vendorId || lines.some(l => !l.itemId)) {
       alert('Please select a vendor and at least one item.');
       return;
     }
 
-    const newPO = purchaseService.createPO({
+    const newPO = await purchaseService.createPO({
       ...formData,
       lines,
       total
     }, user);
     
-    if (shouldIssue) {
-      purchaseService.updatePOStatus(newPO.id, 'Issued', user);
+    if (shouldIssue && newPO) {
+      await purchaseService.updatePOStatus(newPO.id, 'Issued', user);
     }
     
     navigate('/purchases/orders');

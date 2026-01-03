@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, Download, Plus, Edit2, Trash2, Eye, FileUp, ChevronLeft, ChevronRight, RefreshCw, Loader2 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -34,6 +35,7 @@ const ItemsList = () => {
 
   const handleDelete = async (id: string, name: string) => {
     if (!window.confirm(`Delete ${name}?`)) return;
+    // Fixed: Signature of deleteItem now correctly handles the optional user argument
     await itemService.deleteItem(id, user);
     fetchItems();
   };
@@ -85,7 +87,8 @@ const ItemsList = () => {
                   </td>
                   <td className="px-6 py-4 text-sm">{item.category}</td>
                   <td className="px-6 py-4 text-right font-black">AED {item.sellingPrice}</td>
-                  <td className="px-6 py-4 text-right font-bold text-blue-600">{itemService.calculateStock(item)}</td>
+                  {/* Fixed: Pass item.id string instead of the full item object */}
+                  <td className="px-6 py-4 text-right font-bold text-blue-600">{itemService.calculateStock(item.id)}</td>
                   <td className="px-6 py-4 text-right">
                     <button onClick={() => handleDelete(item.id, item.name)} className="text-red-400 p-2"><Trash2 size={16}/></button>
                   </td>

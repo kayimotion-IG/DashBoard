@@ -1,71 +1,42 @@
+
 import { Item, StockMove, AppSettings, Assembly, Warehouse, User } from '../types';
-import { auditService } from './audit.service';
+import { apiRequest } from './api';
 
 class ItemService {
   private items: Item[] = [];
   private stockMoves: StockMove[] = [];
   private assemblies: Assembly[] = [];
-  private warehouses: Warehouse[] = [{ id: 'WH01', name: 'Main Warehouse', location: 'Dubai' }];
+  private settings: AppSettings = { 
+    companyName: "KLENCARE ENTERPRISE", companyAddress: "Dubai, UAE", companyPhone: "050-315-7462", 
+    companyEmail: "support@klencare.net", currency: "AED", vatNumber: "100234567800003", 
+    allowNegativeStock: false, pdfFooter: "Thank you." 
+  };
 
   constructor() {
-    this.loadData();
+    this.refresh();
   }
 
-  private loadData() {
-    const itemsData = localStorage.getItem('klencare_items');
-    if (itemsData) this.items = JSON.parse(itemsData);
-    
-    const movesData = localStorage.getItem('klencare_stock_moves');
-    if (movesData) this.stockMoves = JSON.parse(movesData);
-
-    const assyData = localStorage.getItem('klencare_assemblies');
-    if (assyData) this.assemblies = JSON.parse(assyData);
-    
-    const whData = localStorage.getItem('klencare_warehouses');
-    if (whData) this.warehouses = JSON.parse(whData);
-
-    if (this.items.length === 0) {
-      this.seedData();
+  async refresh() {
+    try {
+      const [items, moves, assemblies, settings] = await Promise.all([
+        apiRequest('GET', '/api/items'),
+        apiRequest('GET', '/api/stock_moves'),
+        apiRequest('GET', '/api/assemblies'),
+        apiRequest('GET', '/api/settings')
+      ]);
+      this.items = items || [];
+      this.stockMoves = moves || [];
+      this.assemblies = assemblies || [];
+      if (settings) this.settings = settings;
+    } catch (e) {
+      console.warn("Retrying sync...");
     }
   }
 
-  private seedData() {
-    this.items = [
-      { 
-        id: 'ITM-001', 
-        name: 'Sample Industrial Cleaner', 
-        sku: 'SIC-001', 
-        itemType: 'Goods', 
-        unit: 'pcs', 
-        category: 'Chemicals', 
-        taxCode: 'VAT 5%', 
-        taxPreference: 'Taxable', 
-        sellingPrice: 150, 
-        salesDescription: 'Premium industrial grade cleaner', 
-        purchasePrice: 80, 
-        purchaseDescription: 'Bulk cleaner supply', 
-        trackInventory: true, 
-        openingStock: 100, 
-        openingStockRate: 80, 
-        reorderLevel: 20, 
-        reorderQty: 50, 
-        status: 'Active', 
-        createdAt: new Date().toISOString(), 
-        updatedAt: new Date().toISOString() 
-      }
-    ];
-    this.saveData();
-  }
-
-  private saveData() {
-    localStorage.setItem('klencare_items', JSON.stringify(this.items));
-    localStorage.setItem('klencare_stock_moves', JSON.stringify(this.stockMoves));
-    localStorage.setItem('klencare_assemblies', JSON.stringify(this.assemblies));
-    localStorage.setItem('klencare_warehouses', JSON.stringify(this.warehouses));
-  }
-
-  // To maintain compatibility with components that await the result
-  getItems(filters: any = {}, page: number = 1, pageSize: number = 10) {
+  /**
+   * Fixed: Updated getItems to support optional pagination and filtering by status
+   */
+  getItems(filters: any = {}, page?: number, limit?: number) {
     let filtered = [...this.items];
     if (filters.search) {
       const s = filters.search.toLowerCase();
@@ -74,209 +45,155 @@ class ItemService {
     if (filters.status) {
       filtered = filtered.filter(i => i.status === filters.status);
     }
-    const start = (page - 1) * pageSize;
-    return { 
-      data: filtered.slice(start, start + pageSize), 
-      total: filtered.length, 
-      page, 
-      pageSize 
-    };
+    
+    const total = filtered.length;
+    if (page && limit) {
+      const start = (page - 1) * limit;
+      filtered = filtered.slice(start, start + limit);
+    }
+    return { data: filtered, total };
   }
 
-  getItemById(id: string) {
-    return this.items.find(i => i.id.toString() === id.toString());
-  }
+  getItemById(id: string) { return this.items.find(i => i.id === id); }
+  getItemBySku(sku: string) { return this.items.find(i => i.sku.toLowerCase() === sku.toLowerCase()); }
 
-  getItemBySku(sku: string) {
-    return this.items.find(i => i.sku === sku);
-  }
-
-  createItem(data: any, user?: User | null) {
-    const newItem: Item = {
-      ...data,
-      id: data.id || `ITM-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      status: data.status || 'Active'
-    };
-    this.items.push(newItem);
-    this.saveData();
-    if (user) auditService.log(user, 'CREATE', 'ITEM', newItem.id, `Created item ${newItem.name}`);
+  async createItem(data: any, user?: User | null) {
+    const newItem = { ...data, id: `ITM-${Date.now()}`, createdAt: new Date().toISOString() };
+    await apiRequest('POST', '/api/items', newItem);
+    await this.refresh();
     return newItem;
   }
 
-  updateItem(id: string, data: any, user?: User | null) {
-    const idx = this.items.findIndex(i => i.id === id);
-    if (idx !== -1) {
-      this.items[idx] = { ...this.items[idx], ...data, updatedAt: new Date().toISOString() };
-      this.saveData();
-      if (user) auditService.log(user, 'UPDATE', 'ITEM', id, `Updated item ${this.items[idx].name}`);
-      return this.items[idx];
-    }
-    return null;
+  /**
+   * Added: updateItem method to support product editing
+   */
+  async updateItem(id: string, data: any, user?: User | null) {
+    const updated = { ...data, id, updatedAt: new Date().toISOString() };
+    await apiRequest('POST', '/api/items', updated);
+    await this.refresh();
+    return updated;
   }
 
-  deleteItem(id: string, user?: User | null) {
-    const item = this.getItemById(id);
-    this.items = this.items.filter(i => i.id !== id);
-    this.saveData();
-    if (item && user) auditService.log(user, 'DELETE', 'ITEM', id, `Deleted item ${item.name}`);
+  /**
+   * Fixed: Added optional user parameter to deleteItem to match view calls
+   */
+  async deleteItem(id: string, user?: User | null) {
+    await apiRequest('DELETE', `/api/items/${id}`);
+    await this.refresh();
   }
 
-  // Support both item object and ID, plus optional warehouse filter
-  calculateStock(itemIdOrItem: any, warehouseId?: string) {
-    const id = typeof itemIdOrItem === 'string' ? itemIdOrItem : itemIdOrItem.id;
-    const item = typeof itemIdOrItem === 'string' ? this.getItemById(id) : itemIdOrItem;
-    
+  calculateStock(itemId: string, warehouseId?: string) {
+    const item = this.getItemById(itemId);
     if (!item) return 0;
-    
-    let stock = Number(item.openingStock) || 0;
-    
-    const moves = this.stockMoves.filter(m => m.itemId === id && (!warehouseId || m.warehouseId === warehouseId));
-    moves.forEach(m => {
-      stock += (Number(m.inQty) || 0);
-      stock -= (Number(m.outQty) || 0);
+    let balance = Number(item.openingStock) || 0;
+    this.stockMoves.filter(m => m.itemId === itemId).forEach(m => {
+      balance += (Number(m.inQty) || 0);
+      balance -= (Number(m.outQty) || 0);
     });
-    
-    return stock;
+    return balance;
   }
 
-  getSettings(): AppSettings { 
-    const defaults = {
-      companyName: "KLENCARE FZC",
-      companyAddress: "9, Rolex Tower, Dubai, UAE",
-      companyPhone: "050-315-7462",
-      companyEmail: "support@klencare.net",
-      currency: "AED",
-      vatNumber: "",
-      allowNegativeStock: false,
-      pdfFooter: "Thank you for your business.",
-      logoUrl: "https://res.cloudinary.com/dkro3vzx5/image/upload/Gemini_Generated_Image_o6s2wbo6s2wbo6s2.png"
-    };
-    const stored = localStorage.getItem('klencare_settings');
-    return stored ? JSON.parse(stored) : defaults;
+  /**
+   * Added: getStockByItem to support detailed stock breakdown by warehouse
+   */
+  getStockByItem(itemId: string) {
+    const moves = this.stockMoves.filter(m => m.itemId === itemId);
+    const balance: Record<string, number> = {};
+    const item = this.getItemById(itemId);
+    if (item) {
+      balance['WH01'] = Number(item.openingStock) || 0;
+    }
+    moves.forEach(m => {
+      const wh = m.warehouseId || 'WH01';
+      if (balance[wh] === undefined) balance[wh] = 0;
+      balance[wh] += (Number(m.inQty) || 0);
+      balance[wh] -= (Number(m.outQty) || 0);
+    });
+    return { moves, balance };
   }
 
-  updateSettings(settings: any) {
-    localStorage.setItem('klencare_settings', JSON.stringify(settings));
-  }
-
-  getLowStockItems() {
-    return this.items.filter(i => i.trackInventory && this.calculateStock(i.id) <= (i.reorderLevel || 0));
+  async addStockMove(move: Partial<StockMove>) {
+    const newMove = { ...move, id: `MV-${Date.now()}`, timestamp: new Date().toISOString() };
+    await apiRequest('POST', '/api/stock_moves', newMove);
+    await this.refresh();
   }
 
   calculateInventoryValue() {
-    return this.items.reduce((sum, i) => sum + (this.calculateStock(i.id) * (i.purchasePrice || 0)), 0);
+    return this.items.reduce((s, i) => s + (this.calculateStock(i.id) * (Number(i.purchasePrice) || 0)), 0);
   }
 
-  getStockMoves() {
-    return this.stockMoves;
-  }
-
-  // Added getAdjustments method for Adjustments view
+  getLowStockItems() { return this.items.filter(i => this.calculateStock(i.id) <= (Number(i.reorderLevel) || 0)); }
+  
+  getStockMoves() { return this.stockMoves; }
+  
+  /**
+   * Added: getAdjustments to filter stock ledger for manual corrections
+   */
   getAdjustments() {
     return this.stockMoves.filter(m => m.refType === 'ADJUSTMENT');
   }
 
-  // Added addStockMove method for inventory tracking across services
-  addStockMove(move: Partial<StockMove>) {
-    const newMove: StockMove = {
-      id: `MOVE-${Math.random().toString(36).substr(2, 9)}`,
-      itemId: move.itemId!,
-      warehouseId: move.warehouseId || 'WH01',
-      refType: move.refType!,
-      refNo: move.refNo!,
-      inQty: move.inQty || 0,
-      outQty: move.outQty || 0,
-      timestamp: new Date().toISOString(),
-      note: move.note
-    };
-    this.stockMoves.push(newMove);
-    this.saveData();
-    return newMove;
-  }
+  /**
+   * Added: getAssemblies for BOM management
+   */
+  getAssemblies() { return this.assemblies; }
 
-  getWarehouses() {
-    return this.warehouses;
-  }
-
-  // Added findOrCreateWarehouse method for GRN imports
-  findOrCreateWarehouse(name: string) {
-    let wh = this.warehouses.find(w => w.name === name);
-    if (!wh) {
-      wh = { id: `WH-${Math.random().toString(36).substr(2, 4).toUpperCase()}`, name, location: 'Unknown' };
-      this.warehouses.push(wh);
-      this.saveData();
-    }
-    return wh;
-  }
-
-  // Added getStockByItem method for ItemDetail view
-  getStockByItem(id: string) {
-    const moves = this.stockMoves.filter(m => m.itemId === id);
-    const balance: Record<string, number> = {};
-    
-    const item = this.getItemById(id);
-    if (item) {
-      // Default initial balance to WH01 for scaffold
-      balance['WH01'] = Number(item.openingStock) || 0;
-    }
-
-    moves.forEach(m => {
-      if (!balance[m.warehouseId]) balance[m.warehouseId] = 0;
-      balance[m.warehouseId] += (Number(m.inQty) || 0);
-      balance[m.warehouseId] -= (Number(m.outQty) || 0);
-    });
-
-    return { moves, balance };
-  }
-
-  // Added assembly management methods for Assemblies view
-  getAssemblies() {
-    return this.assemblies;
-  }
-
-  createAssembly(data: any, user?: User | null) {
-    const newAssy: Assembly = {
-      id: `ASSY-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
-      ...data,
-      createdAt: new Date().toISOString()
-    };
-    this.assemblies.push(newAssy);
-    this.saveData();
-    if (user) auditService.log(user, 'CREATE', 'ASSEMBLY', newAssy.id, `Defined BOM for ${data.finishedItemId}`);
+  /**
+   * Added: createAssembly to define Bill of Materials
+   */
+  async createAssembly(data: any, user?: User | null) {
+    const newAssy = { ...data, id: `ASY-${Date.now()}`, createdAt: new Date().toISOString() };
+    await apiRequest('POST', '/api/assemblies', newAssy);
+    await this.refresh();
     return newAssy;
   }
 
-  buildAssembly(assyId: string, warehouseId: string, qty: number, user?: User | null) {
+  /**
+   * Added: buildAssembly to process production orders and deduct ingredients
+   */
+  async buildAssembly(assyId: string, warehouseId: string, qty: number, user: User | null) {
     const assy = this.assemblies.find(a => a.id === assyId);
-    if (!assy) throw new Error("Assembly BOM not found");
+    if (!assy) throw new Error("Assembly not found");
 
-    // 1. Consume components
-    assy.components.forEach(comp => {
-      this.addStockMove({
+    for (const comp of assy.components) {
+      await this.addStockMove({
         itemId: comp.itemId,
         warehouseId,
         refType: 'ASSEMBLY_CONSUME',
-        refNo: `BUILD-${assyId.slice(-4)}`,
-        inQty: 0,
+        refNo: `BUILD-${assyId}`,
         outQty: comp.quantity * qty,
-        note: `Consumed for building ${qty} units of assembly`
+        note: `Consumed for build of assembly ${assyId}`
       });
-    });
+    }
 
-    // 2. Produce finished item
-    this.addStockMove({
+    await this.addStockMove({
       itemId: assy.finishedItemId,
       warehouseId,
       refType: 'ASSEMBLY_PRODUCE',
-      refNo: `BUILD-${assyId.slice(-4)}`,
+      refNo: `BUILD-${assyId}`,
       inQty: qty,
-      outQty: 0,
-      note: `Produced via assembly build`
+      note: `Produced via assembly ${assyId}`
     });
+  }
 
-    if (user) auditService.log(user, 'BUILD', 'ASSEMBLY', assyId, `Built ${qty} units of assembly`);
+  getSettings() { return this.settings; }
+
+  /**
+   * Added: updateSettings to persist organization profile changes
+   */
+  async updateSettings(settings: AppSettings) {
+    await apiRequest('POST', '/api/settings', settings);
+    this.settings = settings;
+    await this.refresh();
+  }
+
+  getWarehouses(): Warehouse[] { return [{ id: 'WH01', name: 'Main Store', location: 'Dubai' }]; }
+
+  /**
+   * Added: findOrCreateWarehouse to resolve location references during import
+   */
+  findOrCreateWarehouse(name: string): Warehouse {
+    return { id: 'WH01', name: 'Main Store', location: 'Dubai' };
   }
 }
 

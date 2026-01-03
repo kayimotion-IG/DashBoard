@@ -28,11 +28,12 @@ export default function GoodsReceiveForm() {
     setLines(lines.map(l => l.id === id ? { ...l, [field]: val } : l));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Fixed: Made handleSubmit async to correctly await the createGRN call
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.vendorId || lines.some(l => !l.itemId)) return;
     
-    purchaseService.createGRN({
+    await purchaseService.createGRN({
       ...formData,
       lines,
       total: lines.reduce((s, l) => s + (l.quantity * l.unitCost), 0)

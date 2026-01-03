@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
@@ -37,14 +36,14 @@ export default function PurchaseOrderDetail() {
     }
   };
 
-  const handleIssue = () => {
-    purchaseService.updatePOStatus(po.id, 'Issued', user);
+  const handleIssue = async () => {
+    await purchaseService.updatePOStatus(po.id, 'Issued', user);
     setPO({...po, status: 'Issued'});
   };
 
-  const handleReceive = () => {
+  const handleReceive = async () => {
     try {
-      purchaseService.receivePO(po.id, 'WH01', user);
+      await purchaseService.receivePO(po.id, 'WH01', user);
       setPO({...po, status: 'Received'});
       alert('Items received into Main Warehouse. Stock ledger updated.');
     } catch (err: any) {
@@ -52,10 +51,14 @@ export default function PurchaseOrderDetail() {
     }
   };
 
-  const handleBill = () => {
-    purchaseService.createBillFromPO(po.id, user);
-    setPO({...po, status: 'Billed'});
-    alert('Vendor bill generated for this order.');
+  const handleBill = async () => {
+    try {
+      await purchaseService.createBillFromPO(po.id, user);
+      setPO({...po, status: 'Billed'});
+      alert('Vendor bill generated for this order.');
+    } catch (err: any) {
+      alert(err.message);
+    }
   };
 
   const StatusStepper = () => (
@@ -171,8 +174,8 @@ export default function PurchaseOrderDetail() {
                 <tr>
                   <th className="px-8 py-4">Item Catalog #</th>
                   <th className="px-6 py-4 text-center">Qty</th>
-                  <th className="px-6 py-4 text-right">Unit Cost</th>
-                  <th className="px-8 py-4 text-right">Line Total</th>
+                  <th className="px-6 py-4 text-right">Unit Cost (AED)</th>
+                  <th className="px-8 py-4 text-right">Line Total (AED)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">

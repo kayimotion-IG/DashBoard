@@ -18,13 +18,14 @@ export default function CreditNoteForm() {
     reason: 'Damaged Goods'
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Fixed: Made handleSubmit async to correctly await the createCreditNote call
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.customerId || formData.amount <= 0) {
       alert('Please provide customer and valid credit amount.');
       return;
     }
-    salesService.createCreditNote(formData, user);
+    await salesService.createCreditNote(formData, user);
     navigate('/sales/credit-notes');
   };
 

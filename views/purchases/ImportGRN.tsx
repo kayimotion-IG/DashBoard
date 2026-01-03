@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -68,7 +67,8 @@ export default function ImportGRN() {
     }
   };
 
-  const processImport = () => {
+  // FIX: processImport is now async to handle awaited service calls correctly
+  const processImport = async () => {
     let grnsCreatedCount = 0;
     let linesCreatedCount = 0;
     let failedCount = 0;
@@ -105,13 +105,14 @@ export default function ImportGRN() {
     });
 
     // Process each group
-    Object.keys(grnGroups).forEach(receiveNo => {
+    for (const receiveNo of Object.keys(grnGroups)) {
       const lines = grnGroups[receiveNo];
       const firstLine = lines[0];
 
       try {
         // Resolve Vendor
-        const vendor = purchaseService.findOrCreateVendor(firstLine.vendorName, user);
+        // FIX: Added await to findOrCreateVendor
+        const vendor = await purchaseService.findOrCreateVendor(firstLine.vendorName, user);
         
         // Resolve Warehouse
         const warehouse = itemService.findOrCreateWarehouse(firstLine.warehouse || 'Main Warehouse');
@@ -119,17 +120,19 @@ export default function ImportGRN() {
         const grnLines: any[] = [];
         let grnTotal = 0;
 
-        lines.forEach((line, lIdx) => {
+        for (const line of lines) {
           // Resolve Item
           let item = itemService.getItemBySku(line.sku);
           if (!item) {
-            item = itemService.createItem({
+            // FIX: itemService.createItem is async, must be awaited
+            item = await itemService.createItem({
               name: line.itemName || line.sku,
               sku: line.sku,
-              type: 'Inventory',
+              itemType: 'Goods',
               trackInventory: true,
               category: 'General',
-              costPrice: Number(line.unitCost) || 0
+              purchasePrice: Number(line.unitCost) || 0,
+              sellingPrice: (Number(line.unitCost) || 0) * 1.2
             }, user);
           }
 
@@ -149,9 +152,10 @@ export default function ImportGRN() {
 
           grnTotal += lineTotal;
           linesCreatedCount++;
-        });
+        }
 
-        purchaseService.createGRN({
+        // FIX: purchaseService.createGRN is async, must be awaited
+        await purchaseService.createGRN({
           receiveNo,
           vendorId: vendor.id,
           warehouseId: warehouse.id,
@@ -166,7 +170,7 @@ export default function ImportGRN() {
         failedCount += lines.length;
         errors.push(`GRN ${receiveNo}: ${err.message}`);
       }
-    });
+    }
 
     setResults({ 
       totalRows: rows.length, 
