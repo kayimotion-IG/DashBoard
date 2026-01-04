@@ -1,5 +1,4 @@
 
-
 export enum Role {
   Admin = 'Admin',
   SalesManager = 'SalesManager',
@@ -89,7 +88,7 @@ export interface Customer {
   email: string;
   phone: string;
   currency: string;
-  trn?: string; // ADDED: TRN support for customers
+  trn?: string; 
   billingAddress: string;
   shippingAddress: string;
   status: 'Active' | 'Inactive';
@@ -106,7 +105,7 @@ export interface Vendor {
   website?: string;
   currency: string;
   trn?: string;
-  address: string; // General address (Legacy support)
+  address: string; 
   billingAddress?: string;
   shippingAddress?: string;
   status: 'Active' | 'Inactive';
@@ -264,9 +263,9 @@ export interface Invoice {
   balanceDue: number;
   status: 'Sent' | 'Partially Paid' | 'Paid' | 'Voided';
   lines?: SalesOrderLine[];
-  includeStamp?: boolean; // Persist stamp preference
-  // Added missing notes property to resolve errors in views/sales/InvoiceDetail.tsx
+  includeStamp?: boolean; 
   notes?: string;
+  isPinned?: boolean;
 }
 
 export interface CreditNote {
@@ -279,39 +278,6 @@ export interface CreditNote {
   reason?: string;
 }
 
-export interface SalesReturnLine {
-  itemId: string;
-  quantity: number;
-  rate: number;
-}
-
-export interface SalesReturn {
-  id: string;
-  returnNumber: string;
-  customerId: string;
-  soId?: string;
-  date: string;
-  total: number;
-  status: 'Draft' | 'Received' | 'Cancelled';
-  lines: SalesReturnLine[];
-}
-
-export interface AppDocument {
-  id: string;
-  name: string;
-  type: string;
-  size: number;
-  tags: string[];
-  url: string;
-  createdAt: string;
-  links: DocumentLink[];
-}
-
-export interface DocumentLink {
-  entityType: string;
-  entityId: string;
-}
-
 export interface AppSettings {
   allowNegativeStock: boolean;
   companyName: string;
@@ -322,6 +288,12 @@ export interface AppSettings {
   currency: string;
   pdfFooter: string;
   logoUrl?: string;
+  // NEW: Email Provider Settings
+  smtpHost: string;
+  smtpPort: string;
+  smtpUser: string;
+  emailApiKey: string;
+  senderEmail: string;
 }
 
 export interface User {
@@ -332,13 +304,32 @@ export interface User {
   avatar?: string;
 }
 
+/* Added missing AuditLogEntry interface to resolve errors in audit service */
 export interface AuditLogEntry {
   id: string;
   userId: string;
   userName: string;
   entityType: string;
   entityId: string;
-  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'IMPORT' | 'BUILD' | 'APPROVE' | 'SHIP' | 'RECEIVE' | 'PDF_EXPORT';
+  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'PRINT' | 'EMAIL' | 'OTHER';
   timestamp: string;
   details: string;
+}
+
+/* Added missing DocumentLink interface to resolve errors in document service */
+export interface DocumentLink {
+  entityType: string;
+  entityId: string;
+}
+
+/* Added missing AppDocument interface to resolve errors in document service and views */
+export interface AppDocument {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  tags: string[];
+  url: string;
+  createdAt: string;
+  links: DocumentLink[];
 }

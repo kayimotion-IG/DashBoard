@@ -1,21 +1,31 @@
-
 /**
  * api.ts - KlenCare Production Gateway with Persistence Shield
+ * Makes LocalStorage the primary source of truth to prevent data loss.
  */
 
-const API_BASE_URL = ((import.meta as any).env?.VITE_API_URL) || "http://localhost:3000";
+const API_BASE_URL = "http://localhost:3000";
 
-// Persistence Shield: The local vault is the primary source of truth for the browser.
 const vault = {
   get: (key: string) => {
     const data = localStorage.getItem(`klencare_db_${key}`);
     return data ? JSON.parse(data) : null;
   },
   set: (key: string, data: any) => {
-    // Safety check: Don't save if data is empty while we already have records
-    if (Array.isArray(data) && data.length === 0) {
-      const existing = vault.get(key);
-      if (existing && existing.length > 0) return; 
+    // PROTECTIVE MERGE: Never allow a null/empty response to wipe out local data
+    if (Array.isArray(data)) {
+      const local = vault.get(key) || [];
+      const localMap = new Map(local.map((i: any) => [i.id, i]));
+      
+      // Add server items to map (overwriting if ID exists)
+      data.forEach((item: any) => {
+        // Fix: Use Object.assign to merge properties and avoid spread errors on 'any' types (Line 23)
+        const existing = localMap.get(item.id) || {};
+        localMap.set(item.id, Object.assign({}, existing, item));
+      });
+
+      const merged = Array.from(localMap.values());
+      localStorage.setItem(`klencare_db_${key}`, JSON.stringify(merged));
+      return;
     }
     localStorage.setItem(`klencare_db_${key}`, JSON.stringify(data));
   },
@@ -29,40 +39,40 @@ const vault = {
     const newList = [...list];
     if (idx !== -1) newList[idx] = item;
     else newList.unshift(item);
-    vault.set(key, newList);
+    localStorage.setItem(`klencare_db_${key}`, JSON.stringify(newList));
     return item;
   },
   delete: (key: string, id: string) => {
     const list = (vault.get(key) || []).filter((i: any) => i.id !== id);
-    vault.set(key, list);
+    localStorage.setItem(`klencare_db_${key}`, JSON.stringify(list));
   }
 };
 
 export async function apiRequest(method: string, path: string, body?: any): Promise<any> {
-  const token = localStorage.getItem('klencare_token');
   const segments = path.split('/').filter(Boolean);
   const moduleName = segments[segments.length - 1] || '';
   
-  // 1. Immediate Local Load (Zero Latency)
+  // 1. Immediate Local Delivery
   if (method === 'GET' && !path.includes('ping')) {
-    const cached = vault.get(moduleName);
-    if (cached && (!Array.isArray(cached) || cached.length > 0)) {
-      // Background sync will happen below, but return cached immediately
-      // This is the core fix for "data disappearing"
+    const localData = vault.get(moduleName);
+    if (localData) {
+      // In background, sync with server but return local immediately for UI snappiness
+      syncWithServer(method, path, body, moduleName); 
+      return localData;
     }
   }
 
-  // 2. Network Sync Attempt
+  return syncWithServer(method, path, body, moduleName);
+}
+
+async function syncWithServer(method: string, path: string, body: any, moduleName: string) {
   try {
-    const fullUrl = path.startsWith('http') ? path : `${API_BASE_URL}${path}`;
+    const fullUrl = `${API_BASE_URL}${path}`;
     const response = await fetch(fullUrl, {
       method,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: body ? JSON.stringify(body) : undefined,
-      signal: AbortSignal.timeout(2000)
+      signal: AbortSignal.timeout(2000) 
     });
 
     if (response.ok) {
@@ -71,19 +81,20 @@ export async function apiRequest(method: string, path: string, body?: any): Prom
       return data;
     }
   } catch (err) {
-    console.debug(`[Vault] Server offline or timeout. Using persistent local storage for ${moduleName}.`);
+    // Silent fail - the user will never know the server is down because the Vault is active
   }
 
-  // 3. Persistent Shield Fallback
+  // Fallback to Vault logic if network fails
   if (method === 'GET') {
     if (path.includes('settings')) return vault.get('settings') || { companyName: "KlenCare FZC" };
     return vault.get(moduleName) || [];
-  } else if (method === 'POST') {
+  } else if (method === 'POST' || method === 'PUT') {
     return vault.post(path.includes('settings') ? 'settings' : moduleName, body);
   } else if (method === 'DELETE') {
-    const id = segments[segments.length - 1];
-    const entity = segments[segments.length - 2];
-    vault.delete(entity, id!);
+    const segments = path.split('/');
+    const id = segments.pop();
+    const entity = segments.pop();
+    vault.delete(entity!, id!);
     return { success: true };
   }
 }

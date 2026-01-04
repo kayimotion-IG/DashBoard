@@ -1,12 +1,14 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Receipt, Search, Filter, Plus, 
-  ArrowRight, FileDown, Link as LinkIcon, X
+  ArrowRight, FileDown, Link as LinkIcon, X, Pin, PinOff,
+  MailCheck
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { salesService } from '../../services/sales.service';
 import { pdfService } from '../../services/pdf.service';
+import { apiRequest } from '../../services/api';
 import { useAuth } from '../../App';
 import { Invoice } from '../../types';
 
@@ -29,11 +31,33 @@ export default function Invoices() {
   const navigate = useNavigate();
   const { user, can } = useAuth();
   const [search, setSearch] = useState('');
-  
-  const invoices = salesService.getInvoices();
+  const [invoices, setInvoices] = useState(salesService.getInvoices());
+  const [comms, setComms] = useState<any[]>([]);
+
+  const fetchComms = async () => {
+    try {
+      const data = await apiRequest('GET', '/api/communications');
+      setComms(data || []);
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    const unsubscribe = salesService.onChange(() => {
+      setInvoices(salesService.getInvoices());
+    });
+    fetchComms();
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   const filteredInvoices = useMemo(() => {
-    const sorted = [...invoices].reverse();
+    const sorted = [...invoices].sort((a, b) => {
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
+    });
+
     if (!search) return sorted;
     
     const s = search.toLowerCase();
@@ -55,6 +79,16 @@ export default function Invoices() {
     } else {
       alert('Customer record not found for this invoice.');
     }
+  };
+
+  const togglePin = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    await salesService.togglePinInvoice(id);
+  };
+
+  // Check if an invoice has ever been sent via email
+  const isEmailed = (id: string) => {
+    return comms.some(c => c.entityId === id && c.entityType === 'INVOICE');
   };
 
   return (
@@ -106,7 +140,7 @@ export default function Invoices() {
               <tr>
                 <th className="px-8 py-5">Invoice Details</th>
                 <th className="px-6 py-5">Customer</th>
-                <th className="px-6 py-5">Source Order</th>
+                <th className="px-6 py-5 text-center">Dispatch</th>
                 <th className="px-6 py-5 text-right">Total</th>
                 <th className="px-6 py-5 text-right">Balance Due</th>
                 <th className="px-6 py-5">Status</th>
@@ -117,16 +151,19 @@ export default function Invoices() {
               {filteredInvoices.length > 0 ? filteredInvoices.map(inv => {
                 const customer = salesService.getCustomerById(inv.customerId);
                 const so = inv.soId ? salesService.getSOById(inv.soId) : null;
+                const dispatched = isEmailed(inv.id);
                 
                 return (
                   <tr 
                     key={inv.id} 
-                    className="hover:bg-slate-50/50 transition-colors group cursor-pointer"
+                    className={`hover:bg-slate-50/50 transition-colors group cursor-pointer ${inv.isPinned ? 'bg-amber-50/30' : ''}`}
                     onClick={() => navigate(`/sales/invoices/view/${inv.id}`)}
                   >
                     <td className="px-8 py-6">
                       <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-[18px] flex items-center justify-center font-black text-xs shadow-sm group-hover:scale-105 transition-transform">INV</div>
+                        <div className={`w-12 h-12 rounded-[18px] flex items-center justify-center font-black text-xs shadow-sm group-hover:scale-105 transition-transform ${inv.isPinned ? 'bg-brand text-slate-900' : 'bg-indigo-50 text-indigo-600'}`}>
+                          {inv.isPinned ? <Pin size={16} /> : 'INV'}
+                        </div>
                         <div>
                           <p className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors">{inv.invoiceNumber}</p>
                           <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mt-0.5">{new Date(inv.date).toLocaleDateString('en-GB')}</p>
@@ -136,17 +173,14 @@ export default function Invoices() {
                     <td className="px-6 py-6">
                       <p className="text-xs font-bold text-slate-700">{customer?.name}</p>
                     </td>
-                    <td className="px-6 py-6">
-                      {so ? (
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); navigate(`/sales/orders/${so.id}`); }}
-                          className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-black uppercase hover:bg-blue-50 hover:text-blue-600 transition-all border border-slate-200"
-                        >
-                          <LinkIcon size={10} /> {so.orderNumber}
-                        </button>
-                      ) : (
-                        <span className="text-[10px] text-slate-300 font-bold uppercase tracking-widest italic">Direct</span>
-                      )}
+                    <td className="px-6 py-6 text-center">
+                       {dispatched ? (
+                         <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[9px] font-black uppercase tracking-widest border border-emerald-100 shadow-sm" title="Emailed successfully">
+                           <MailCheck size={12}/> SENT
+                         </span>
+                       ) : (
+                         <span className="text-[10px] text-slate-300 font-bold uppercase italic">PENDING</span>
+                       )}
                     </td>
                     <td className="px-6 py-6 text-right font-black text-slate-900">AED {inv.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                     <td className="px-6 py-6 text-right">
@@ -159,6 +193,13 @@ export default function Invoices() {
                     </td>
                     <td className="px-8 py-6 text-right">
                       <div className="flex justify-end gap-2">
+                        <button 
+                          onClick={(e) => togglePin(e, inv.id)}
+                          className={`p-3 rounded-xl transition-all border border-transparent ${inv.isPinned ? 'text-brand hover:bg-amber-100' : 'text-slate-300 hover:text-brand hover:bg-white hover:shadow-md hover:border-slate-100'}`}
+                          title={inv.isPinned ? 'Unpin Invoice' : 'Pin Invoice'}
+                        >
+                          {inv.isPinned ? <Pin size={18} fill="currentColor" /> : <PinOff size={18} />}
+                        </button>
                         <button 
                           onClick={(e) => handleDownload(e, inv)}
                           className="p-3 text-slate-400 hover:text-blue-600 hover:bg-white hover:shadow-md border border-transparent hover:border-slate-100 rounded-xl transition-all"

@@ -31,8 +31,10 @@ class BackupService {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `klencare_DESKTOP_MIGRATION_${new Date().toISOString().split('T')[0]}.json`;
+    link.download = `klencare_DATA_SNAPSHOT_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link); // Ensure browser detection
     link.click();
+    document.body.removeChild(link);
     URL.revokeObjectURL(url);
   }
 
@@ -66,9 +68,10 @@ class BackupService {
     const link = document.createElement("a");
     link.setAttribute("href", url);
     link.setAttribute("download", `${filename}_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
+    document.body.appendChild(link); // CRITICAL: Fix for Safari/Firefox
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   }
 }
 

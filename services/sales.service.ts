@@ -10,9 +10,19 @@ class SalesService {
   private receipts: PaymentReceived[] = [];
   private credits: CreditNote[] = [];
   private deliveries: DeliveryChallan[] = [];
+  private listeners: Set<() => void> = new Set();
 
   constructor() {
     this.refresh();
+  }
+
+  onChange(callback: () => void) {
+    this.listeners.add(callback);
+    return () => this.listeners.delete(callback);
+  }
+
+  private notify() {
+    this.listeners.forEach(cb => cb());
   }
 
   async refresh() {
@@ -32,7 +42,7 @@ class SalesService {
       this.receipts = pays || [];
       this.credits = creds || [];
       this.deliveries = dcs || [];
-      
+      this.notify();
     } catch (e) { 
       console.error("Sales Service Sync Failure", e); 
     }
@@ -46,6 +56,15 @@ class SalesService {
   getPaymentsReceived() { return this.receipts; }
   getCreditNotes() { return this.credits; }
   getSOById(id: string) { return this.orders.find(o => o.id === id); }
+
+  // NEW: Calculate the cost basis of a set of line items
+  calculateLineCost(lines: any[]) {
+    return lines.reduce((sum, line) => {
+      const item = itemService.getItemById(line.itemId);
+      const cost = Number(item?.purchasePrice) || 0;
+      return sum + (cost * (Number(line.quantity) || 0));
+    }, 0);
+  }
 
   async createCustomer(data: any, user: any) {
     const nc = { 
@@ -99,7 +118,8 @@ class SalesService {
       id: `INV-${Date.now()}`, 
       invoiceNumber: data.invoiceNumber || `INV-${Date.now().toString().slice(-4)}`,
       balanceDue: Number(data.total),
-      status: 'Sent' 
+      status: 'Sent',
+      isPinned: false
     };
     await apiRequest('POST', '/api/invoices', inv);
     if (data.lines) {
@@ -124,7 +144,16 @@ class SalesService {
     return res;
   }
 
-  async sendInvoiceEmail(id: string, emailData: { to: string, subject: string, body: string }) {
+  async togglePinInvoice(id: string) {
+    const inv = this.invoices.find(i => i.id === id);
+    if (inv) {
+      const updated = { ...inv, isPinned: !inv.isPinned };
+      await apiRequest('POST', '/api/invoices', updated);
+      await this.refresh();
+    }
+  }
+
+  async sendInvoiceEmail(id: string, emailData: any) {
     return await apiRequest('POST', `/api/invoices/${id}/email`, emailData);
   }
 

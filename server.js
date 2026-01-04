@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import cors from 'cors';
+import { Resend } from 'resend';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,22 +21,11 @@ const modules = [
   'items', 'customers', 'vendors', 'sales_orders', 'purchase_orders', 
   'invoices', 'bills', 'stock_moves', 'payments_received', 
   'payments_made', 'credit_notes', 'assemblies', 'delivery_challans', 
-  'users', 'receives', 'settings'
+  'users', 'receives', 'settings', 'communications'
 ];
 
 const saveEntityData = (name, data) => {
   const filePath = path.join(DATA_DIR, `${name}.json`);
-  if (fs.existsSync(filePath)) {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const backupPath = path.join(BACKUP_DIR, `${name}-${timestamp}.json`);
-    fs.copyFileSync(filePath, backupPath);
-    const backups = fs.readdirSync(BACKUP_DIR)
-      .filter(f => f.startsWith(name))
-      .sort((a, b) => fs.statSync(path.join(BACKUP_DIR, b)).mtimeMs - fs.statSync(path.join(BACKUP_DIR, a)).mtimeMs);
-    if (backups.length > 5) {
-      backups.slice(5).forEach(f => fs.unlinkSync(path.join(BACKUP_DIR, f)));
-    }
-  }
   const tempPath = `${filePath}.tmp`;
   fs.writeFileSync(tempPath, JSON.stringify(data, null, 2), 'utf8');
   fs.renameSync(tempPath, filePath);
@@ -45,7 +35,11 @@ const loadEntityData = (name) => {
   const filePath = path.join(DATA_DIR, `${name}.json`);
   if (!fs.existsSync(filePath)) {
     if (name === 'users') return [{ id: '1', username: 'admin', name: 'System Admin', role: 'Admin', email: 'admin@klencare.net' }];
-    if (name === 'settings') return { companyName: "KLENCARE ENTERPRISE", currency: "AED" };
+    if (name === 'settings') return { 
+      companyName: "KLENCARE ENTERPRISE", 
+      currency: "AED",
+      senderEmail: "billing@crm.klencare.net"
+    };
     return [];
   }
   try {
@@ -57,9 +51,6 @@ const loadEntityData = (name) => {
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
-
-// Health Check
-app.get('/api/ping', (req, res) => res.json({ status: 'online', storage: 'persistent_disk' }));
 
 // Module Routes
 modules.forEach(name => {
@@ -80,7 +71,6 @@ modules.forEach(name => {
     res.json(req.body);
   });
 
-  // Specific PUT handler for individual resource updates
   app.put(`/api/${name}/:id`, (req, res) => {
     const currentData = loadEntityData(name);
     const index = currentData.findIndex(i => i.id === req.params.id);
@@ -101,14 +91,77 @@ modules.forEach(name => {
   });
 });
 
-// Dispatch Simulation Routes
-app.post('/api/invoices/:id/email', (req, res) => {
-  console.log(`[Email Dispatch] Sending INV-${req.params.id} to ${req.body.to}`);
-  res.json({ success: true, message: `Email successfully queued for ${req.body.to}` });
-});
+/**
+ * PRODUCTION EMAIL DISPATCH (RESEND INTEGRATION)
+ * Route: POST /api/invoices/:id/email
+ */
+app.post('/api/invoices/:id/email', async (req, res) => {
+  const { to, subject, body, sentBy, plainText } = req.body;
+  const invoiceId = req.params.id;
+  const settings = loadEntityData('settings');
 
-app.post('/api/invoices/:id/pdf', (req, res) => {
-  res.json({ success: true, url: '#' });
+  // Verify Configuration
+  const apiKey = settings.emailApiKey;
+  const fromEmail = settings.senderEmail || 'billing@crm.klencare.net';
+
+  if (!apiKey) {
+    console.warn('[CRM] Dispatch aborted: No API Key found in settings.');
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Email service not configured. Please add your Resend API Key in Settings.' 
+    });
+  }
+
+  const resend = new Resend(apiKey);
+
+  try {
+    console.log(`[Resend] Dispatching to ${to} from ${fromEmail}...`);
+    
+    const { data, error } = await resend.emails.send({
+      from: `${settings.companyName || 'KlenCare CRM'} <${fromEmail}>`,
+      to: [to],
+      subject: subject,
+      // If plainText is true, use 'text' field, otherwise wrap in simple HTML for Resend
+      text: plainText ? body : undefined,
+      html: plainText ? undefined : `<div style="font-family: sans-serif; line-height: 1.5; color: #333;">${body.replace(/\n/g, '<br>')}</div>`,
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    // Record Success in Communications Log
+    const comms = loadEntityData('communications');
+    const newLog = {
+      id: `COMM-${Date.now()}`,
+      entityId: invoiceId,
+      entityType: invoiceId === 'TEST' ? 'SYSTEM' : 'INVOICE',
+      recipient: to,
+      subject,
+      body,
+      sentBy,
+      timestamp: new Date().toISOString(),
+      status: 'Gone',
+      providerId: data.id // Store Resend ID for tracking
+    };
+    
+    comms.unshift(newLog);
+    saveEntityData('communications', comms);
+
+    res.json({ 
+      success: true, 
+      message: `Email successfully dispatched via Resend`, 
+      log: newLog 
+    });
+
+  } catch (err) {
+    console.error('[Resend Error]:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to send email through Resend.', 
+      details: err.message 
+    });
+  }
 });
 
 app.listen(PORT, '0.0.0.0', () => {

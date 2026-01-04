@@ -1,15 +1,15 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
   Save, X, ArrowLeft, Package, DollarSign, 
   Ruler, Info, ShieldCheck, Tag, Warehouse, ShoppingCart,
-  Barcode, Truck, Layers, Weight, Boxes, Maximize
+  Barcode, Truck, Layers, Weight, Boxes, Maximize, Loader2
 } from 'lucide-react';
 import { useAuth } from '../../App';
 import { itemService } from '../../services/item.service';
 import { purchaseService } from '../../services/purchase.service';
 
-// FIXED: Moved outside to prevent re-creation/refocus on every keystroke
 const SectionHeader = ({ icon, title, desc }: any) => (
   <div className="mb-8 border-b border-slate-100 pb-4">
     <div className="flex items-center gap-3 mb-1">
@@ -36,6 +36,7 @@ export default function ItemForm() {
   const isEdit = !!id;
 
   const [activeTab, setActiveTab] = useState<'basic' | 'sales' | 'inventory' | 'physical'>('basic');
+  const [isSaving, setIsSaving] = useState(false);
   const vendors = purchaseService.getVendors();
 
   const [formData, setFormData] = useState<any>({
@@ -57,12 +58,16 @@ export default function ItemForm() {
     }
   }, [id, isEdit]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name?.trim() || !formData.sku?.trim()) {
       setError('Item Name and SKU are mandatory fields.');
       return;
     }
+    
+    setIsSaving(true);
+    setError('');
+
     try {
       const submissionData = {
         ...formData,
@@ -76,12 +81,13 @@ export default function ItemForm() {
         height: Number(formData.height) || 0,
       };
 
-      if (isEdit) itemService.updateItem(id!, submissionData, user);
-      else itemService.createItem(submissionData, user);
+      if (isEdit) await itemService.updateItem(id!, submissionData, user);
+      else await itemService.createItem(submissionData, user);
       
       navigate('/items');
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || 'System failed to commit item to vault.');
+      setIsSaving(false);
     }
   };
 
@@ -98,14 +104,15 @@ export default function ItemForm() {
           </div>
         </div>
         <div className="flex gap-3">
-          <button type="button" onClick={() => navigate('/items')} className="px-6 py-2.5 font-bold text-slate-500 hover:text-slate-900 transition-colors">Discard</button>
+          <button type="button" onClick={() => navigate('/items')} disabled={isSaving} className="px-6 py-2.5 font-bold text-slate-500 hover:text-slate-900 transition-colors">Discard</button>
           <button 
             type="submit" 
             form="item-form"
-            className="flex items-center gap-2 px-10 py-2.5 bg-blue-600 text-white rounded-xl font-black uppercase text-xs tracking-widest shadow-xl shadow-blue-600/20 active:scale-95 transition-all hover:bg-blue-700"
+            disabled={isSaving}
+            className="flex items-center gap-2 px-10 py-2.5 bg-blue-600 text-white rounded-xl font-black uppercase text-xs tracking-widest shadow-xl shadow-blue-600/20 active:scale-95 transition-all hover:bg-blue-700 disabled:opacity-50"
           >
-            <Save size={18} />
-            Commit to Catalog
+            {isSaving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+            {isSaving ? 'Vaulting...' : 'Commit to Catalog'}
           </button>
         </div>
       </div>
@@ -331,8 +338,10 @@ export default function ItemForm() {
             )}
 
             <div className="pt-10 border-t border-slate-100 flex justify-end gap-3">
-              <button type="button" onClick={() => navigate('/items')} className="px-6 py-2.5 font-bold text-slate-500">Cancel</button>
-              <button type="submit" className="px-12 py-3 bg-blue-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-2xl hover:translate-y-[-2px] transition-all active:scale-95">Save Product Record</button>
+              <button type="button" onClick={() => navigate('/items')} disabled={isSaving} className="px-6 py-2.5 font-bold text-slate-500">Cancel</button>
+              <button type="submit" disabled={isSaving} className="px-12 py-3 bg-blue-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-2xl hover:translate-y-[-2px] transition-all active:scale-95 disabled:opacity-50">
+                {isSaving ? 'Synchronizing Vault...' : 'Save Product Record'}
+              </button>
             </div>
           </form>
         </div>

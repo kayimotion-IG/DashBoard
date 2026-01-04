@@ -1,0 +1,26 @@
+
+{
+  "short_name": "KlenCare",
+  "name": "KlenCare ERP",
+  "description": "High-fidelity CRM and Inventory Management System",
+  "icons": [
+    {
+      "src": "https://res.cloudinary.com/dff96688/image/upload/v1/klencare/logo-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://res.cloudinary.com/dff96688/image/upload/v1/klencare/logo-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "theme_color": "#0f172a",
+  "background_color": "#0f172a",
+  "orientation": "any"
+}

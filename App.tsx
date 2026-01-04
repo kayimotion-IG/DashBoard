@@ -6,7 +6,11 @@ import {
   BarChart3, FileText, LogOut, Cloud, Database,
   Truck, Wallet, ClipboardList, Boxes, Receipt, 
   CreditCard, History, Settings as SettingsIcon,
-  PackageCheck, FileMinus, HardDrive, ShieldCheck
+  PackageCheck, FileMinus, HardDrive, ShieldCheck,
+  DownloadCloud, MonitorSmartphone, Wifi, WifiOff,
+  Hammer, ShoppingBag, Store, HandCoins, Loader2, Download,
+  Monitor, Smartphone, ChevronRight, X, Info, CheckCircle,
+  MailCheck
 } from 'lucide-react';
 
 import Dashboard from './views/Dashboard.tsx';
@@ -30,6 +34,7 @@ import DeliveryChallanForm from './views/sales/DeliveryChallanForm.tsx';
 import CreditNotes from './views/sales/CreditNotes.tsx';
 import CreditNoteForm from './views/sales/CreditNoteForm.tsx';
 import Statements from './views/sales/Statements.tsx';
+import CommunicationsLog from './views/operations/CommunicationsLog.tsx';
 
 import Vendors from './views/purchases/Vendors.tsx';
 import VendorForm from './views/purchases/VendorForm.tsx';
@@ -51,7 +56,7 @@ import TeamAccess from './views/admin/TeamAccess.tsx';
 
 import { User, AppSettings, Role } from './types.ts';
 import { itemService } from './services/item.service.ts';
-import { apiRequest } from './services/api.ts';
+import { backupService } from './services/backup.service.ts';
 
 interface AuthContextType {
   user: User | null;
@@ -73,126 +78,165 @@ export const useAuth = () => {
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [installing, setInstalling] = useState(false);
+  const [showInstallGuide, setShowInstallGuide] = useState(false);
+  const [isStandalone, setIsStandalone] = useState(false);
   const [settings, setSettings] = useState<AppSettings>(itemService.getSettings());
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const location = useLocation();
   const navigate = useNavigate();
 
   useEffect(() => {
+    const standalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
+    setIsStandalone(!!standalone);
+
     const session = localStorage.getItem('klencare_session');
+    const adminUser: User = { 
+      id: '1', 
+      name: 'System Owner', 
+      role: Role.Admin, 
+      email: 'admin@klencare.net' 
+    };
+    
     if (!session) {
-      const adminUser: User = { 
-        id: '1', 
-        name: 'System Owner', 
-        role: Role.Admin, 
-        email: 'admin@klencare.net' 
-      };
       localStorage.setItem('klencare_session', JSON.stringify(adminUser));
-      localStorage.setItem('klencare_token', 'local-auto-bypass-' + Date.now());
       setUser(adminUser);
     } else {
-      try { setUser(JSON.parse(session)); } 
-      catch (e) { localStorage.removeItem('klencare_session'); }
+      setUser(JSON.parse(session));
     }
     setLoading(false);
+
+    window.addEventListener('online', () => setIsOnline(true));
+    window.addEventListener('offline', () => setIsOnline(false));
+
+    const handlePrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handlePrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handlePrompt);
   }, []);
 
-  const refreshSettings = () => setSettings(itemService.getSettings());
-
-  const login = async (username: string, pass: string) => {
-    const res = await apiRequest('POST', '/api/auth/login', { username, password: pass });
-    if (res && res.token) {
-      setUser(res.user);
-      navigate('/');
-      return true;
+  const handleInstallApp = async () => {
+    if (isStandalone) return;
+    
+    setInstalling(true);
+    if (!deferredPrompt) {
+      setShowInstallGuide(true);
+      setInstalling(false);
+      return;
     }
-    return false;
+    
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+      setIsStandalone(true);
+    }
+    setInstalling(false);
   };
 
+  const refreshSettings = () => setSettings(itemService.getSettings());
+  const login = async () => true;
   const logout = () => {
-    localStorage.removeItem('klencare_token');
     localStorage.removeItem('klencare_session');
     setUser(null);
-    navigate('/login');
   };
-
   const can = (perm: string) => true;
 
-  if (loading) return (
-    <div className="h-screen w-screen flex items-center justify-center bg-[#0f172a]">
-      <div className="w-12 h-12 border-4 border-brand border-t-transparent rounded-full animate-spin"></div>
-    </div>
-  );
+  if (loading) return <div className="h-screen w-screen flex items-center justify-center bg-slate-900"><div className="w-10 h-10 border-4 border-brand border-t-transparent rounded-full animate-spin"></div></div>;
 
   const NavItem = ({ label, icon, path }: { label: string, icon: any, path: string }) => {
     const active = location.pathname === path || (path !== '/' && location.pathname.startsWith(path));
     return (
-      <Link to={path} className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all text-xs font-bold ${active ? 'bg-brand text-slate-900 shadow-lg' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
-        {React.cloneElement(icon, { size: 16 })}
+      <Link to={path} className={`flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-[11px] font-bold ${active ? 'bg-brand text-slate-900 shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
+        {React.cloneElement(icon, { size: 14 })}
         {label}
       </Link>
     );
   };
 
+  const NavSection = ({ title, children }: { title: string, children?: React.ReactNode }) => (
+    <div className="space-y-0.5 pt-4 first:pt-0">
+      <p className="px-3 text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1.5">{title}</p>
+      {children}
+    </div>
+  );
+
   return (
     <AuthContext.Provider value={{ user, loading, login, logout, can, settings, refreshSettings }}>
-      <div className="flex h-screen bg-slate-50 overflow-hidden text-slate-900 font-sans">
-        <aside className="w-64 bg-slate-900 flex flex-col border-r border-slate-800 shrink-0">
-          <div className="p-6 border-b border-slate-800/50">
+      <div className="flex h-screen bg-slate-50 overflow-hidden text-slate-900 font-sans relative">
+        <aside className="w-64 bg-slate-950 flex flex-col border-r border-slate-800 shrink-0">
+          <div className="p-5 border-b border-slate-800/50 flex items-center justify-between">
              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 bg-brand rounded-xl flex items-center justify-center font-black text-slate-900 shadow-lg text-lg">K</div>
-                <span className="text-lg font-bold text-white tracking-tight italic">KlenCare <span className="text-brand">ERP</span></span>
+                <div className="w-7 h-7 bg-brand rounded-lg flex items-center justify-center font-black text-slate-900 shadow-lg text-xs">K</div>
+                <span className="text-sm font-bold text-white tracking-tight">KlenCare <span className="text-brand">ERP</span></span>
              </div>
           </div>
           
-          <nav className="flex-1 overflow-y-auto p-4 space-y-5 sidebar-scroll">
-            <NavItem label="Command Dashboard" icon={<LayoutDashboard />} path="/" />
+          <nav className="flex-1 overflow-y-auto p-3 space-y-1 sidebar-scroll custom-scrollbar">
+            <NavItem label="Control Center" icon={<LayoutDashboard />} path="/" />
 
-            <div className="space-y-1">
-              <p className="px-4 text-[10px] font-black text-slate-600 uppercase tracking-widest mb-2">Inventory Control</p>
+            <NavSection title="Inventory Suite">
               <NavItem label="Items Catalog" icon={<Package />} path="/items" />
-              <NavItem label="Stock Status" icon={<Boxes />} path="/inventory/dashboard" />
-              <NavItem label="Assemblies / BOM" icon={<HardDrive />} path="/inventory/assemblies" />
-              <NavItem label="Adjustments" icon={<History />} path="/inventory/adjustments" />
-            </div>
+              <NavItem label="Stock Levels" icon={<Boxes />} path="/inventory/dashboard" />
+              <NavItem label="Adjustments" icon={<ClipboardList />} path="/inventory/adjustments" />
+              <NavItem label="Assemblies (BOM)" icon={<Hammer />} path="/inventory/assemblies" />
+            </NavSection>
 
-            <div className="space-y-1">
-              <p className="px-4 text-[10px] font-black text-slate-600 uppercase tracking-widest mb-2">Sales & Fulfillment</p>
+            <NavSection title="Sales Operations">
               <NavItem label="Customers" icon={<Users />} path="/sales/customers" />
               <NavItem label="Sales Orders" icon={<ShoppingCart />} path="/sales/orders" />
               <NavItem label="Tax Invoices" icon={<Receipt />} path="/sales/invoices" />
-              <NavItem label="Delivery Challans" icon={<PackageCheck />} path="/sales/delivery-challans" />
+              <NavItem label="Dispatch Logs" icon={<MailCheck />} path="/operations/communications" />
+              <NavItem label="Delivery (GRN)" icon={<Truck />} path="/sales/delivery-challans" />
               <NavItem label="Credit Notes" icon={<FileMinus />} path="/sales/credit-notes" />
-            </div>
+              <NavItem label="Statements" icon={<FileText />} path="/sales/statements" />
+            </NavSection>
 
-            <div className="space-y-1">
-              <p className="px-4 text-[10px] font-black text-slate-600 uppercase tracking-widest mb-2">Purchases & Payables</p>
-              <NavItem label="Vendors" icon={<Truck />} path="/purchases/vendors" />
-              <NavItem label="Purchase Orders" icon={<ClipboardList />} path="/purchases/orders" />
-              <NavItem label="Goods Receive (GRN)" icon={<HardDrive />} path="/purchases/receives" />
+            <NavSection title="Purchasing & AP">
+              <NavItem label="Suppliers" icon={<Store />} path="/purchases/vendors" />
+              <NavItem label="Purchase Orders" icon={<ShoppingBag />} path="/purchases/orders" />
+              <NavItem label="Goods Receive" icon={<PackageCheck />} path="/purchases/receives" />
               <NavItem label="Vendor Bills" icon={<Wallet />} path="/purchases/bills" />
               <NavItem label="Payments Made" icon={<CreditCard />} path="/purchases/payments" />
-            </div>
+            </NavSection>
 
-            <div className="space-y-1">
-              <p className="px-4 text-[10px] font-black text-slate-600 uppercase tracking-widest mb-2">Analytics</p>
-              <NavItem label="Intelligence Reports" icon={<BarChart3 />} path="/reports" />
-            </div>
+            <NavSection title="Analytics">
+              <NavItem label="Financial Reports" icon={<BarChart3 />} path="/reports" />
+            </NavSection>
           </nav>
 
-          <div className="p-4 border-t border-slate-800 bg-slate-900/50">
-            <div className="flex items-center gap-3 px-2 py-2">
-              <div className="w-8 h-8 rounded-full bg-brand flex items-center justify-center text-[10px] font-black text-slate-900 uppercase">{user?.name?.substring(0,2)}</div>
+          <div className="p-3 space-y-2 bg-slate-900/40 border-t border-slate-800">
+            <button 
+              onClick={handleInstallApp}
+              disabled={installing}
+              className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg font-black text-[9px] uppercase tracking-widest transition-all border ${
+                isStandalone 
+                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' 
+                : 'bg-slate-800 hover:bg-slate-700 text-brand border-brand/10 shadow-lg shadow-black/20'
+              }`}
+            >
+              {installing ? <Loader2 size={14} className="animate-spin"/> : isStandalone ? <CheckCircle size={14} /> : <DownloadCloud size={14} />}
+              {installing ? 'Preparing...' : isStandalone ? 'Desktop Ready' : 'Install ERP App'}
+            </button>
+
+            <div className="flex items-center gap-3 px-1 py-1">
+              <div className="w-8 h-8 rounded-full bg-brand flex items-center justify-center text-[10px] font-black text-slate-900 uppercase">AD</div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-white truncate">{user?.name}</p>
-                <p className="text-[9px] text-brand font-black uppercase tracking-wider">{user?.role}</p>
+                <p className="text-[10px] font-bold text-white truncate">{user?.name}</p>
+                <div className="flex items-center gap-1">
+                  <ShieldCheck size={10} className="text-emerald-500" />
+                  <p className="text-[8px] text-slate-400 font-bold uppercase">Enterprise Admin</p>
+                </div>
               </div>
-              <Link to="/settings" className="text-slate-500 hover:text-white"><SettingsIcon size={16} /></Link>
-              <button onClick={logout} className="text-slate-500 hover:text-white p-1"><LogOut size={16} /></button>
+              <Link to="/settings" className="text-slate-500 hover:text-white p-1.5 hover:bg-slate-800 rounded-lg transition-all"><SettingsIcon size={14} /></Link>
             </div>
           </div>
         </aside>
 
-        <main className="flex-1 overflow-y-auto p-8 relative">
+        <main className="flex-1 overflow-y-auto p-8 relative bg-slate-50">
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/items" element={<ItemsList />} />
@@ -216,6 +260,7 @@ export default function App() {
             <Route path="/sales/credit-notes" element={<CreditNotes />} />
             <Route path="/sales/credit-notes/new" element={<CreditNoteForm />} />
             <Route path="/sales/statements" element={<Statements />} />
+            <Route path="/operations/communications" element={<CommunicationsLog />} />
             <Route path="/purchases/vendors" element={<Vendors />} />
             <Route path="/purchases/vendors/new" element={<VendorForm />} />
             <Route path="/purchases/vendors/edit/:id" element={<VendorForm />} />
@@ -236,6 +281,83 @@ export default function App() {
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </main>
+
+        {showInstallGuide && (
+          <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6 bg-slate-950/90 backdrop-blur-sm animate-in fade-in duration-300">
+            <div className="bg-white w-full max-w-2xl rounded-[40px] shadow-2xl overflow-hidden flex flex-col border border-white/10 animate-in zoom-in-95 duration-300">
+              <div className="p-8 border-b border-slate-100 flex items-center justify-between shrink-0 bg-slate-50/50">
+                <div className="flex items-center gap-4">
+                   <div className="p-3 bg-brand/10 text-brand rounded-2xl shadow-sm"><MonitorSmartphone size={24}/></div>
+                   <div>
+                      <h3 className="font-black text-slate-900 uppercase tracking-widest text-sm">Desktop Installation Hub</h3>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Native Experience Assistant</p>
+                   </div>
+                </div>
+                <button onClick={() => setShowInstallGuide(false)} className="p-2.5 text-slate-400 hover:text-rose-500 transition-colors bg-white rounded-xl shadow-sm border border-slate-100"><X size={20} /></button>
+              </div>
+              
+              <div className="flex-1 p-10 space-y-10 overflow-y-auto">
+                 <div className="space-y-4">
+                    <h4 className="text-xl font-black text-slate-900 tracking-tight">KlenCare ERP is a Progressive Enterprise App.</h4>
+                    <p className="text-slate-500 text-sm leading-relaxed">
+                       To "install" it on your PC, you don't need a bulky .exe file. Follow these steps to add it to your Start Menu, Taskbar, or Desktop:
+                    </p>
+                 </div>
+
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 space-y-4">
+                       <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-blue-600 text-white rounded-lg flex items-center justify-center shadow-md"><Monitor size={16}/></div>
+                          <h5 className="font-black text-xs uppercase text-slate-900">Chrome / Edge (PC)</h5>
+                       </div>
+                       <ul className="text-xs text-slate-600 space-y-3 font-medium">
+                          <li className="flex gap-2">
+                             <span className="w-5 h-5 bg-white border rounded-full flex items-center justify-center shrink-0 font-bold text-[10px]">1</span>
+                             Look for the <span className="font-black text-blue-600">Install</span> icon in the right side of your Address Bar.
+                          </li>
+                          <li className="flex gap-2">
+                             <span className="w-5 h-5 bg-white border rounded-full flex items-center justify-center shrink-0 font-bold text-[10px]">2</span>
+                             Click it and select <span className="font-bold">Install</span> when prompted.
+                          </li>
+                       </ul>
+                    </div>
+
+                    <div className="p-6 bg-rose-50 rounded-3xl border border-rose-100 space-y-4">
+                       <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-rose-600 text-white rounded-lg flex items-center justify-center shadow-md"><Smartphone size={16}/></div>
+                          <h5 className="font-black text-xs uppercase text-slate-900">Safari (Mac/iOS)</h5>
+                       </div>
+                       <ul className="text-xs text-slate-600 space-y-3 font-medium">
+                          <li className="flex gap-2">
+                             <span className="w-5 h-5 bg-white border rounded-full flex items-center justify-center shrink-0 font-bold text-[10px]">1</span>
+                             Tap the <span className="font-black text-rose-600">Share</span> icon (square with arrow).
+                          </li>
+                          <li className="flex gap-2">
+                             <span className="w-5 h-5 bg-white border rounded-full flex items-center justify-center shrink-0 font-bold text-[10px]">2</span>
+                             Scroll and tap <span className="font-bold">"Add to Home Screen"</span>.
+                          </li>
+                       </ul>
+                    </div>
+                 </div>
+
+                 <div className="p-6 bg-slate-900 rounded-3xl text-white flex items-center justify-between group cursor-pointer" onClick={() => backupService.exportClientState()}>
+                    <div className="flex items-center gap-4">
+                       <div className="p-3 bg-white/10 rounded-2xl"><Download size={20}/></div>
+                       <div>
+                          <p className="text-sm font-black">Still having trouble?</p>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Download Offline Database Backup Instead</p>
+                       </div>
+                    </div>
+                    <ChevronRight className="text-slate-500 group-hover:text-brand transition-all" size={20}/>
+                 </div>
+              </div>
+
+              <div className="p-8 border-t border-slate-100 bg-slate-50 flex justify-center">
+                 <button onClick={() => setShowInstallGuide(false)} className="px-12 py-3 bg-slate-900 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl hover:bg-slate-800 transition-all active:scale-95">Got it, let's go</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </AuthContext.Provider>
   );
