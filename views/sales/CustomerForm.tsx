@@ -4,7 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { 
   Save, X, ArrowLeft, Building2, 
   Globe, Mail, Phone, MapPin, CheckCircle2,
-  Copy, Loader2
+  Copy, Loader2, ShieldCheck
 } from 'lucide-react';
 import { useAuth } from '../../App';
 import { salesService } from '../../services/sales.service';
@@ -21,6 +21,7 @@ export default function CustomerForm() {
     email: '',
     phone: '',
     currency: 'AED',
+    trn: '', // ADDED: trn state
     billingAddress: '',
     shippingAddress: '',
     status: 'Active',
@@ -63,7 +64,6 @@ export default function CustomerForm() {
       console.error("[Customer Form Error]", err);
       setError(err.message || 'An error occurred while saving the customer profile.');
     } finally {
-      // CRITICAL: Stop spinning regardless of outcome
       setIsSaving(false);
     }
   };
@@ -230,6 +230,19 @@ export default function CustomerForm() {
                 <option value="GBP">GBP - British Pound</option>
                 <option value="INR">INR - Indian Rupee</option>
               </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tax Registration (TRN)</label>
+              <div className="relative">
+                <ShieldCheck className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                <input 
+                  disabled={isSaving}
+                  value={formData.trn}
+                  onChange={e => setFormData({...formData, trn: e.target.value})}
+                  placeholder="e.g. 10023..."
+                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 text-sm !bg-white !text-slate-900"
+                />
+              </div>
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Status</label>

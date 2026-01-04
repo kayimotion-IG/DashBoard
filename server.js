@@ -3,8 +3,6 @@ import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
 import cors from 'cors';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -12,104 +10,107 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = 3000;
-const DB_FILE = path.join(__dirname, 'database.json');
-const JWT_SECRET = 'klencare-pro-2026-secure-key';
+const DATA_DIR = path.join(__dirname, 'data');
+const BACKUP_DIR = path.join(DATA_DIR, 'backups');
 
-// Database Initialization
-const initialData = {
-  users: [{ id: '1', username: 'admin', password_hash: bcrypt.hashSync('admin', 10), name: 'System Admin', role: 'Admin', email: 'admin@klencare.net' }],
-  items: [],
-  customers: [],
-  vendors: [],
-  sales_orders: [],
-  purchase_orders: [],
-  invoices: [],
-  bills: [],
-  stock_moves: [],
-  payments_received: [],
-  payments_made: [],
-  credit_notes: [],
-  assemblies: [],
-  delivery_challans: [],
-  receives: [],
-  settings: { 
-    companyName: "KLENCARE ENTERPRISE", 
-    companyAddress: "Dubai, UAE", 
-    companyPhone: "+971 50 315 7462", 
-    companyEmail: "support@klencare.net", 
-    currency: "AED", 
-    vatNumber: "100234567800003", 
-    allowNegativeStock: false 
-  }
-};
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
+if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR);
 
-const initDb = () => {
-  if (!fs.existsSync(DB_FILE)) {
-    fs.writeFileSync(DB_FILE, JSON.stringify(initialData, null, 2));
-  }
-};
-
-const readDb = () => JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
-const writeDb = (data) => fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
-
-initDb();
-
-app.use(cors());
-app.use(express.json({ limit: '50mb' }));
-
-// Auth API
-app.post('/api/auth/login', (req, res) => {
-  const { username, password } = req.body;
-  const db = readDb();
-  const user = db.users.find(u => u.username === username);
-  if (user && (password === 'admin' || bcrypt.compareSync(password, user.password_hash))) {
-    const token = jwt.sign({ id: user.id }, JWT_SECRET);
-    res.json({ token, user: { id: user.id, name: user.name, role: user.role, username: user.username } });
-  } else {
-    res.status(401).json({ error: 'Invalid credentials' });
-  }
-});
-
-// Dynamic CRUD Routes
 const modules = [
   'items', 'customers', 'vendors', 'sales_orders', 'purchase_orders', 
   'invoices', 'bills', 'stock_moves', 'payments_received', 
   'payments_made', 'credit_notes', 'assemblies', 'delivery_challans', 
-  'users', 'receives'
+  'users', 'receives', 'settings'
 ];
 
+const saveEntityData = (name, data) => {
+  const filePath = path.join(DATA_DIR, `${name}.json`);
+  if (fs.existsSync(filePath)) {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const backupPath = path.join(BACKUP_DIR, `${name}-${timestamp}.json`);
+    fs.copyFileSync(filePath, backupPath);
+    const backups = fs.readdirSync(BACKUP_DIR)
+      .filter(f => f.startsWith(name))
+      .sort((a, b) => fs.statSync(path.join(BACKUP_DIR, b)).mtimeMs - fs.statSync(path.join(BACKUP_DIR, a)).mtimeMs);
+    if (backups.length > 5) {
+      backups.slice(5).forEach(f => fs.unlinkSync(path.join(BACKUP_DIR, f)));
+    }
+  }
+  const tempPath = `${filePath}.tmp`;
+  fs.writeFileSync(tempPath, JSON.stringify(data, null, 2), 'utf8');
+  fs.renameSync(tempPath, filePath);
+};
+
+const loadEntityData = (name) => {
+  const filePath = path.join(DATA_DIR, `${name}.json`);
+  if (!fs.existsSync(filePath)) {
+    if (name === 'users') return [{ id: '1', username: 'admin', name: 'System Admin', role: 'Admin', email: 'admin@klencare.net' }];
+    if (name === 'settings') return { companyName: "KLENCARE ENTERPRISE", currency: "AED" };
+    return [];
+  }
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch (e) {
+    return [];
+  }
+};
+
+app.use(cors());
+app.use(express.json({ limit: '50mb' }));
+
+// Health Check
+app.get('/api/ping', (req, res) => res.json({ status: 'online', storage: 'persistent_disk' }));
+
+// Module Routes
 modules.forEach(name => {
-  app.get(`/api/${name}`, (req, res) => {
-    const db = readDb();
-    res.json(db[name] || []);
-  });
+  app.get(`/api/${name}`, (req, res) => res.json(loadEntityData(name)));
   
   app.post(`/api/${name}`, (req, res) => {
-    const db = readDb();
-    if (!db[name]) db[name] = [];
-    const index = db[name].findIndex(i => i.id === req.body.id);
-    if (index !== -1) db[name][index] = req.body;
-    else db[name].push(req.body);
-    writeDb(db);
+    const currentData = loadEntityData(name);
+    let updatedData;
+    if (name === 'settings') {
+      updatedData = req.body;
+    } else {
+      const index = currentData.findIndex(i => i.id === req.body.id);
+      updatedData = [...currentData];
+      if (index !== -1) updatedData[index] = req.body;
+      else updatedData.unshift(req.body);
+    }
+    saveEntityData(name, updatedData);
     res.json(req.body);
+  });
+
+  // Specific PUT handler for individual resource updates
+  app.put(`/api/${name}/:id`, (req, res) => {
+    const currentData = loadEntityData(name);
+    const index = currentData.findIndex(i => i.id === req.params.id);
+    if (index !== -1) {
+      currentData[index] = { ...currentData[index], ...req.body };
+      saveEntityData(name, currentData);
+      res.json(currentData[index]);
+    } else {
+      res.status(404).json({ error: 'Not Found' });
+    }
   });
   
   app.delete(`/api/${name}/:id`, (req, res) => {
-    const db = readDb();
-    db[name] = db[name].filter(i => i.id !== req.params.id);
-    writeDb(db);
+    const currentData = loadEntityData(name);
+    const updatedData = currentData.filter(i => i.id !== req.params.id);
+    saveEntityData(name, updatedData);
     res.json({ success: true });
   });
 });
 
-app.get('/api/settings', (req, res) => res.json(readDb().settings));
-app.post('/api/settings', (req, res) => {
-  const db = readDb();
-  db.settings = req.body;
-  writeDb(db);
-  res.json(db.settings);
+// Dispatch Simulation Routes
+app.post('/api/invoices/:id/email', (req, res) => {
+  console.log(`[Email Dispatch] Sending INV-${req.params.id} to ${req.body.to}`);
+  res.json({ success: true, message: `Email successfully queued for ${req.body.to}` });
 });
 
-app.listen(PORT, () => {
-  console.log(`Backend Engine Online: http://localhost:${PORT}`);
+app.post('/api/invoices/:id/pdf', (req, res) => {
+  res.json({ success: true, url: '#' });
+});
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`\n KLENCARE CRM PERSISTENCE ENGINE ACTIVE ON PORT ${PORT}`);
 });

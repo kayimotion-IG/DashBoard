@@ -1,4 +1,5 @@
 
+
 export enum Role {
   Admin = 'Admin',
   SalesManager = 'SalesManager',
@@ -88,6 +89,7 @@ export interface Customer {
   email: string;
   phone: string;
   currency: string;
+  trn?: string; // ADDED: TRN support for customers
   billingAddress: string;
   shippingAddress: string;
   status: 'Active' | 'Inactive';
@@ -263,6 +265,8 @@ export interface Invoice {
   status: 'Sent' | 'Partially Paid' | 'Paid' | 'Voided';
   lines?: SalesOrderLine[];
   includeStamp?: boolean; // Persist stamp preference
+  // Added missing notes property to resolve errors in views/sales/InvoiceDetail.tsx
+  notes?: string;
 }
 
 export interface CreditNote {

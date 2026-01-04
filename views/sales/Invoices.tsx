@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { 
   Receipt, Search, Filter, Plus, 
@@ -121,7 +122,7 @@ export default function Invoices() {
                   <tr 
                     key={inv.id} 
                     className="hover:bg-slate-50/50 transition-colors group cursor-pointer"
-                    onClick={() => navigate(`/sales/invoices/new?id=${inv.id}`)}
+                    onClick={() => navigate(`/sales/invoices/view/${inv.id}`)}
                   >
                     <td className="px-8 py-6">
                       <div className="flex items-center gap-4">
@@ -166,7 +167,7 @@ export default function Invoices() {
                           <FileDown size={18} />
                         </button>
                         <button 
-                          onClick={(e) => { e.stopPropagation(); navigate(`/sales/invoices/new?id=${inv.id}`); }}
+                          onClick={(e) => { e.stopPropagation(); navigate(`/sales/invoices/view/${inv.id}`); }}
                           className="p-3 text-slate-400 hover:text-slate-900 hover:bg-white hover:shadow-md border border-transparent hover:border-slate-100 rounded-xl transition-all"
                         >
                           <ArrowRight size={18} />

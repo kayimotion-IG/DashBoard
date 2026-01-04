@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { Routes, Route, Navigate, Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
@@ -23,6 +24,7 @@ import SalesOrderForm from './views/sales/SalesOrderForm.tsx';
 import SalesOrderDetail from './views/sales/SalesOrderDetail.tsx';
 import Invoices from './views/sales/Invoices.tsx';
 import InvoiceForm from './views/sales/InvoiceForm.tsx';
+import InvoiceDetail from './views/sales/InvoiceDetail.tsx';
 import DeliveryChallanList from './views/sales/DeliveryChallanList.tsx';
 import DeliveryChallanForm from './views/sales/DeliveryChallanForm.tsx';
 import CreditNotes from './views/sales/CreditNotes.tsx';
@@ -76,7 +78,6 @@ export default function App() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // 1. AUTO-LOGIN BYPASS
     const session = localStorage.getItem('klencare_session');
     if (!session) {
       const adminUser: User = { 
@@ -92,7 +93,6 @@ export default function App() {
       try { setUser(JSON.parse(session)); } 
       catch (e) { localStorage.removeItem('klencare_session'); }
     }
-    
     setLoading(false);
   }, []);
 
@@ -115,7 +115,7 @@ export default function App() {
     navigate('/login');
   };
 
-  const can = (perm: string) => true; // Grant all to current session
+  const can = (perm: string) => true;
 
   if (loading) return (
     <div className="h-screen w-screen flex items-center justify-center bg-[#0f172a]">
@@ -210,6 +210,7 @@ export default function App() {
             <Route path="/sales/orders/:id" element={<SalesOrderDetail />} />
             <Route path="/sales/invoices" element={<Invoices />} />
             <Route path="/sales/invoices/new" element={<InvoiceForm />} />
+            <Route path="/sales/invoices/view/:id" element={<InvoiceDetail />} />
             <Route path="/sales/delivery-challans" element={<DeliveryChallanList />} />
             <Route path="/sales/delivery-challans/new" element={<DeliveryChallanForm />} />
             <Route path="/sales/credit-notes" element={<CreditNotes />} />

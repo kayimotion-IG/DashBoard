@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from 'react';
+
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Truck, Search, Filter, Plus, Mail, Phone, 
   ChevronRight, Wallet, MapPin, FileUp, Edit2, Trash2, X, ArrowRight,
-  HandCoins
+  HandCoins, RefreshCw, Loader2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { purchaseService } from '../../services/purchase.service';
@@ -13,8 +14,19 @@ export default function Vendors() {
   const navigate = useNavigate();
   const { user, can } = useAuth();
   const [search, setSearch] = useState('');
-  
-  const vendors = purchaseService.getVendors();
+  const [loading, setLoading] = useState(true);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+
+  const fetchData = async () => {
+    setLoading(true);
+    await purchaseService.refresh();
+    setVendors(purchaseService.getVendors());
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const filteredVendors = useMemo(() => {
     if (!search) return vendors;
@@ -27,9 +39,11 @@ export default function Vendors() {
     );
   }, [search, vendors]);
 
-  const handleDelete = (id: string, name: string) => {
+  const handleDelete = async (id: string, name: string) => {
     if (!window.confirm(`Are you sure you want to delete vendor "${name}"?`)) return;
-    purchaseService.deleteVendor(id, user!);
+    setLoading(true);
+    await purchaseService.deleteVendor(id, user!);
+    await fetchData();
   };
 
   const handleNavigateDetail = (id: string) => {
@@ -49,6 +63,12 @@ export default function Vendors() {
           <p className="text-slate-500 text-sm">Manage suppliers and track outgoing liabilities.</p>
         </div>
         <div className="flex items-center gap-3">
+          <button 
+            onClick={fetchData}
+            className="p-2.5 bg-white border border-slate-200 text-slate-500 rounded-xl hover:bg-slate-50 transition-all"
+          >
+            <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+          </button>
           {can('purchases.create') && (
             <>
               <button 
@@ -70,7 +90,7 @@ export default function Vendors() {
         </div>
       </div>
 
-      <div className="bg-white rounded-[32px] border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-[32px] border border-slate-200 shadow-sm overflow-hidden min-h-[400px]">
         <div className="p-6 bg-slate-50 border-b border-slate-100 flex items-center gap-4">
           <div className="relative flex-1 max-w-lg group">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" size={20} />
@@ -87,110 +107,99 @@ export default function Vendors() {
               </button>
             )}
           </div>
-          <button className="p-3 text-slate-500 hover:bg-white rounded-2xl border border-slate-200 shadow-sm transition-all"><Filter size={20} /></button>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="bg-white text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] border-b border-slate-50">
-              <tr>
-                <th className="px-8 py-5">Vendor Details</th>
-                <th className="px-6 py-5">Contact & Location</th>
-                <th className="px-6 py-5 text-right">Payables (AP)</th>
-                <th className="px-6 py-5">Status</th>
-                <th className="px-8 py-5 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredVendors.length > 0 ? filteredVendors.map(vendor => {
-                const balance = purchaseService.getVendorBalance(vendor.id);
-                return (
-                  <tr 
-                    key={vendor.id} 
-                    className="hover:bg-slate-50/50 transition-colors group cursor-pointer"
-                    onClick={() => handleNavigateDetail(vendor.id)}
-                  >
-                    <td className="px-8 py-6">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-[18px] flex items-center justify-center font-black text-xs shadow-sm">VND</div>
-                        <div>
-                          <p className="text-sm font-bold text-slate-900">{vendor.name}</p>
-                          <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mt-0.5">{vendor.companyName}</p>
+          {loading && vendors.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-24 text-slate-400">
+              <Loader2 className="animate-spin mb-4" size={40} />
+              <p className="font-bold">Syncing Vendor Master...</p>
+            </div>
+          ) : (
+            <table className="w-full text-left">
+              <thead className="bg-white text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] border-b border-slate-50">
+                <tr>
+                  <th className="px-8 py-5">Vendor Details</th>
+                  <th className="px-6 py-5">Contact & Location</th>
+                  <th className="px-6 py-5 text-right">Payables (AP)</th>
+                  <th className="px-6 py-5">Status</th>
+                  <th className="px-8 py-5 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredVendors.length > 0 ? filteredVendors.map(vendor => {
+                  const balance = purchaseService.getVendorBalance(vendor.id);
+                  return (
+                    <tr 
+                      key={vendor.id} 
+                      className="hover:bg-slate-50/50 transition-colors group cursor-pointer"
+                      onClick={() => handleNavigateDetail(vendor.id)}
+                    >
+                      <td className="px-8 py-6">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-[18px] flex items-center justify-center font-black text-xs shadow-sm">VND</div>
+                          <div>
+                            <p className="text-sm font-bold text-slate-900">{vendor.name}</p>
+                            <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mt-0.5">{vendor.companyName}</p>
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-6">
-                      <div className="space-y-1.5">
-                        <div className="flex items-center gap-2 text-xs font-medium text-slate-600">
-                          <Mail size={12} className="text-slate-400" />
-                          {vendor.email || 'No email registered'}
+                      </td>
+                      <td className="px-6 py-6">
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-2 text-xs font-medium text-slate-600">
+                            <Mail size={12} className="text-slate-400" />
+                            {vendor.email || 'No email registered'}
+                          </div>
+                          <div className="flex items-center gap-2 text-xs font-medium text-slate-600">
+                            <MapPin size={12} className="text-slate-400" />
+                            <span className="truncate max-w-[200px]">{vendor.address || 'No address specified'}</span>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2 text-xs font-medium text-slate-600">
-                          <MapPin size={12} className="text-slate-400" />
-                          <span className="truncate max-w-[200px]">{vendor.address || 'No address specified'}</span>
+                      </td>
+                      <td className="px-6 py-6 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Wallet size={16} className={balance > 0 ? 'text-red-500' : 'text-slate-300'} />
+                          <span className={`text-base font-black ${balance > 0 ? 'text-red-600' : 'text-slate-600'}`}>
+                            AED {balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          </span>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-6 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Wallet size={16} className={balance > 0 ? 'text-red-500' : 'text-slate-300'} />
-                        <span className={`text-base font-black ${balance > 0 ? 'text-red-600' : 'text-slate-600'}`}>
-                          AED {balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="px-6 py-6">
+                        <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black border ${vendor.status === 'Active' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                          {vendor.status.toUpperCase()}
                         </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-6">
-                      <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black border ${vendor.status === 'Active' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
-                        {vendor.status.toUpperCase()}
-                      </span>
-                    </td>
-                    <td className="px-8 py-6 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {balance > 0 && (
+                      </td>
+                      <td className="px-8 py-6 text-right">
+                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button 
-                            onClick={(e) => handleQuickPay(e, vendor.id)}
-                            className="p-3 text-[#fbaf0f] hover:bg-[#fbaf0f]/10 rounded-xl transition-all"
-                            title="Record Payment"
+                            onClick={(e) => { e.stopPropagation(); navigate(`/purchases/vendors/edit/${vendor.id}`); }}
+                            className="p-3 text-slate-400 hover:text-blue-600 hover:bg-white rounded-xl shadow-none hover:shadow-md border border-transparent hover:border-slate-100 transition-all"
                           >
-                            <HandCoins size={22} />
+                            <Edit2 size={20} />
                           </button>
-                        )}
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); navigate(`/purchases/vendors/edit/${vendor.id}`); }}
-                          className="p-3 text-slate-400 hover:text-blue-600 hover:bg-white rounded-xl shadow-none hover:shadow-md border border-transparent hover:border-slate-100 transition-all"
-                          title="Edit Profile"
-                        >
-                          <Edit2 size={20} />
-                        </button>
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); handleDelete(vendor.id, vendor.name); }}
-                          className="p-3 text-slate-400 hover:text-red-600 hover:bg-white rounded-xl shadow-none hover:shadow-md border border-transparent hover:border-slate-100 transition-all"
-                          title="Delete"
-                        >
-                          <Trash2 size={20} />
-                        </button>
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); handleNavigateDetail(vendor.id); }}
-                          className="p-3 text-slate-400 hover:text-slate-900 hover:bg-white rounded-xl shadow-none hover:shadow-md border border-transparent hover:border-slate-100 transition-all"
-                        >
-                          <ArrowRight size={24} />
-                        </button>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); handleDelete(vendor.id, vendor.name); }}
+                            className="p-3 text-slate-400 hover:text-red-600 hover:bg-white rounded-xl shadow-none hover:shadow-md border border-transparent hover:border-slate-100 transition-all"
+                          >
+                            <Trash2 size={20} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                }) : (
+                  <tr>
+                    <td colSpan={5} className="px-8 py-24 text-center">
+                      <div className="flex flex-col items-center gap-4 text-slate-300 italic">
+                        <Truck size={64} className="opacity-10" />
+                        <p className="text-sm">No suppliers found in the database.</p>
                       </div>
                     </td>
                   </tr>
-                );
-              }) : (
-                <tr>
-                  <td colSpan={5} className="px-8 py-24 text-center">
-                    <div className="flex flex-col items-center gap-4 text-slate-300">
-                      <Truck size={64} className="opacity-10" />
-                      <p className="text-sm font-medium italic">No vendors match "{search}"</p>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </div>

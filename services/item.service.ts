@@ -7,9 +7,14 @@ class ItemService {
   private stockMoves: StockMove[] = [];
   private assemblies: Assembly[] = [];
   private settings: AppSettings = { 
-    companyName: "KLENCARE ENTERPRISE", companyAddress: "Dubai, UAE", companyPhone: "050-315-7462", 
-    companyEmail: "support@klencare.net", currency: "AED", vatNumber: "100234567800003", 
-    allowNegativeStock: false, pdfFooter: "Thank you." 
+    companyName: "KlenCare FZC", 
+    companyAddress: "9 Rolex Tower, Sheikh Zayed Road, Dubai, UAE", 
+    companyPhone: "+971 50 315 7462", 
+    companyEmail: "support@klencare.net", 
+    currency: "AED", 
+    vatNumber: "", 
+    allowNegativeStock: false, 
+    pdfFooter: "Thank you for your Purchase - KlenCare FZC" 
   };
 
   constructor() {
@@ -24,18 +29,18 @@ class ItemService {
         apiRequest('GET', '/api/assemblies'),
         apiRequest('GET', '/api/settings')
       ]);
+      
       this.items = items || [];
       this.stockMoves = moves || [];
       this.assemblies = assemblies || [];
-      if (settings) this.settings = settings;
+      if (settings && settings.companyName) {
+        this.settings = settings;
+      }
     } catch (e) {
-      console.warn("Retrying sync...");
+      console.warn("Sync refresh pending...");
     }
   }
 
-  /**
-   * Fixed: Updated getItems to support optional pagination and filtering by status
-   */
   getItems(filters: any = {}, page?: number, limit?: number) {
     let filtered = [...this.items];
     if (filters.search) {
@@ -45,7 +50,6 @@ class ItemService {
     if (filters.status) {
       filtered = filtered.filter(i => i.status === filters.status);
     }
-    
     const total = filtered.length;
     if (page && limit) {
       const start = (page - 1) * limit;
@@ -64,9 +68,6 @@ class ItemService {
     return newItem;
   }
 
-  /**
-   * Added: updateItem method to support product editing
-   */
   async updateItem(id: string, data: any, user?: User | null) {
     const updated = { ...data, id, updatedAt: new Date().toISOString() };
     await apiRequest('POST', '/api/items', updated);
@@ -74,9 +75,6 @@ class ItemService {
     return updated;
   }
 
-  /**
-   * Fixed: Added optional user parameter to deleteItem to match view calls
-   */
   async deleteItem(id: string, user?: User | null) {
     await apiRequest('DELETE', `/api/items/${id}`);
     await this.refresh();
@@ -93,16 +91,11 @@ class ItemService {
     return balance;
   }
 
-  /**
-   * Added: getStockByItem to support detailed stock breakdown by warehouse
-   */
   getStockByItem(itemId: string) {
     const moves = this.stockMoves.filter(m => m.itemId === itemId);
     const balance: Record<string, number> = {};
     const item = this.getItemById(itemId);
-    if (item) {
-      balance['WH01'] = Number(item.openingStock) || 0;
-    }
+    if (item) balance['WH01'] = Number(item.openingStock) || 0;
     moves.forEach(m => {
       const wh = m.warehouseId || 'WH01';
       if (balance[wh] === undefined) balance[wh] = 0;
@@ -123,24 +116,10 @@ class ItemService {
   }
 
   getLowStockItems() { return this.items.filter(i => this.calculateStock(i.id) <= (Number(i.reorderLevel) || 0)); }
-  
   getStockMoves() { return this.stockMoves; }
-  
-  /**
-   * Added: getAdjustments to filter stock ledger for manual corrections
-   */
-  getAdjustments() {
-    return this.stockMoves.filter(m => m.refType === 'ADJUSTMENT');
-  }
-
-  /**
-   * Added: getAssemblies for BOM management
-   */
+  getAdjustments() { return this.stockMoves.filter(m => m.refType === 'ADJUSTMENT'); }
   getAssemblies() { return this.assemblies; }
 
-  /**
-   * Added: createAssembly to define Bill of Materials
-   */
   async createAssembly(data: any, user?: User | null) {
     const newAssy = { ...data, id: `ASY-${Date.now()}`, createdAt: new Date().toISOString() };
     await apiRequest('POST', '/api/assemblies', newAssy);
@@ -148,39 +127,24 @@ class ItemService {
     return newAssy;
   }
 
-  /**
-   * Added: buildAssembly to process production orders and deduct ingredients
-   */
   async buildAssembly(assyId: string, warehouseId: string, qty: number, user: User | null) {
     const assy = this.assemblies.find(a => a.id === assyId);
     if (!assy) throw new Error("Assembly not found");
-
     for (const comp of assy.components) {
       await this.addStockMove({
-        itemId: comp.itemId,
-        warehouseId,
-        refType: 'ASSEMBLY_CONSUME',
-        refNo: `BUILD-${assyId}`,
-        outQty: comp.quantity * qty,
+        itemId: comp.itemId, warehouseId, refType: 'ASSEMBLY_CONSUME',
+        refNo: `BUILD-${assyId}`, outQty: comp.quantity * qty,
         note: `Consumed for build of assembly ${assyId}`
       });
     }
-
     await this.addStockMove({
-      itemId: assy.finishedItemId,
-      warehouseId,
-      refType: 'ASSEMBLY_PRODUCE',
-      refNo: `BUILD-${assyId}`,
-      inQty: qty,
-      note: `Produced via assembly ${assyId}`
+      itemId: assy.finishedItemId, warehouseId, refType: 'ASSEMBLY_PRODUCE',
+      refNo: `BUILD-${assyId}`, inQty: qty, note: `Produced via assembly ${assyId}`
     });
   }
 
   getSettings() { return this.settings; }
 
-  /**
-   * Added: updateSettings to persist organization profile changes
-   */
   async updateSettings(settings: AppSettings) {
     await apiRequest('POST', '/api/settings', settings);
     this.settings = settings;
@@ -188,13 +152,7 @@ class ItemService {
   }
 
   getWarehouses(): Warehouse[] { return [{ id: 'WH01', name: 'Main Store', location: 'Dubai' }]; }
-
-  /**
-   * Added: findOrCreateWarehouse to resolve location references during import
-   */
-  findOrCreateWarehouse(name: string): Warehouse {
-    return { id: 'WH01', name: 'Main Store', location: 'Dubai' };
-  }
+  findOrCreateWarehouse(name: string): Warehouse { return { id: 'WH01', name: 'Main Store', location: 'Dubai' }; }
 }
 
 export const itemService = new ItemService();

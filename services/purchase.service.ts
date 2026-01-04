@@ -16,7 +16,7 @@ class PurchaseService {
 
   async refresh() {
     try {
-      const results = await Promise.allSettled([
+      const [vnds, bils, pos, pays, recs] = await Promise.all([
         apiRequest('GET', '/api/vendors'),
         apiRequest('GET', '/api/bills'),
         apiRequest('GET', '/api/purchase_orders'),
@@ -24,11 +24,11 @@ class PurchaseService {
         apiRequest('GET', '/api/receives')
       ]);
 
-      if (results[0].status === 'fulfilled') this.vendors = results[0].value;
-      if (results[1].status === 'fulfilled') this.bills = results[1].value;
-      if (results[2].status === 'fulfilled') this.purchaseOrders = results[2].value;
-      if (results[3].status === 'fulfilled') this.paymentsMade = results[3].value;
-      if (results[4].status === 'fulfilled') this.receives = results[4].value;
+      this.vendors = vnds || [];
+      this.bills = bils || [];
+      this.purchaseOrders = pos || [];
+      this.paymentsMade = pays || [];
+      this.receives = recs || [];
     } catch (e) {
       console.error("Purchase Sync Failed", e);
     }
@@ -43,10 +43,15 @@ class PurchaseService {
   getReceives() { return this.receives; }
 
   async createVendor(data: any, user: User | null) {
-    const nv = { ...data, id: `VND-${Date.now()}`, status: 'Active', createdAt: new Date().toISOString() };
-    await apiRequest('POST', '/api/vendors', nv);
+    const nv = { 
+      ...data, 
+      id: `VND-${Date.now()}`, 
+      status: data.status || 'Active', 
+      createdAt: new Date().toISOString() 
+    };
+    const saved = await apiRequest('POST', '/api/vendors', nv);
     await this.refresh();
-    return nv;
+    return saved;
   }
 
   async findOrCreateVendor(name: string, user: User | null) {
@@ -57,8 +62,9 @@ class PurchaseService {
 
   async updateVendor(id: string, data: any, user: User | null) {
     const updated = { ...data, id };
-    await apiRequest('POST', '/api/vendors', updated);
+    const saved = await apiRequest('POST', '/api/vendors', updated);
     await this.refresh();
+    return saved;
   }
 
   async deleteVendor(id: string, user: User) {
