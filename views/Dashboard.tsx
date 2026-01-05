@@ -6,7 +6,6 @@ import {
   ArrowUpRight, ArrowDownRight,
   ShoppingCart, Boxes, Receipt, ArrowRight, HandCoins,
   Clock, FileText, Loader2, Handshake, Pin, MailCheck, Globe,
-  /* Add missing CheckCircle2 import */
   CheckCircle2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -38,9 +37,8 @@ const Dashboard = () => {
     
     // Fetch last communication
     const comms = await apiRequest('GET', '/api/communications');
-    const lastComm = comms && comms.length > 0 ? comms[0] : null;
+    const lastComm = (comms && Array.isArray(comms) && comms.length > 0) ? comms[0] : null;
 
-    const activeSos = sos.filter(s => s.status !== 'Invoiced' && s.status !== 'Closed');
     const grossRevenue = invs.filter(i => i.status !== 'Voided').reduce((sum, i) => sum + (Number(i.total) || 0), 0);
     
     const totalCost = invs.filter(i => i.status !== 'Voided').reduce((sum, i) => {
@@ -63,7 +61,6 @@ const Dashboard = () => {
     const pinnedInvoices = invs.filter(i => i.isPinned).slice(0, 3);
 
     setDashboardData({
-      activeSos,
       grossRevenue,
       grossProfit,
       arTotal,
@@ -72,8 +69,7 @@ const Dashboard = () => {
       lowStockCount,
       pinnedInvoices,
       lastComm,
-      financialStream: stream,
-      pendingOrders: sos.filter(s => s.status === 'Confirmed' || s.status === 'Draft').slice(0, 4)
+      financialStream: stream
     });
     setLoading(false);
   };
@@ -123,7 +119,7 @@ const Dashboard = () => {
                <div>
                   <div className="flex items-center gap-3">
                     <h2 className="text-4xl font-black text-white tracking-tight">KlenCare Enterprise</h2>
-                    <span className="px-3 py-1 bg-emerald-50/20 text-emerald-400 rounded-full text-[10px] font-black uppercase tracking-widest border border-emerald-500/30 flex items-center gap-1">
+                    <span className="px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded-full text-[10px] font-black uppercase tracking-widest border border-emerald-500/30 flex items-center gap-1">
                       <ShieldCheck size={12}/> Vault Persistent
                     </span>
                   </div>
@@ -220,7 +216,7 @@ const Dashboard = () => {
                       <h3 className="text-sm font-black text-slate-900 uppercase tracking-[0.2em]">Communication Relay</h3>
                    </div>
                    <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[9px] font-black uppercase border border-emerald-100">
-                      <Globe size={10}/> mx.hostinger.com
+                      <Globe size={10}/> Relay Ready
                    </div>
                 </div>
                 

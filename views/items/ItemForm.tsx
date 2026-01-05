@@ -1,10 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
   Save, X, ArrowLeft, Package, DollarSign, 
   Ruler, Info, ShieldCheck, Tag, Warehouse, ShoppingCart,
-  Barcode, Truck, Layers, Weight, Boxes, Maximize, Loader2
+  Barcode, Truck, Layers, Weight, Boxes, Maximize, Loader2,
+  ImagePlus, Trash2, Camera
 } from 'lucide-react';
 import { useAuth } from '../../App';
 import { itemService } from '../../services/item.service';
@@ -22,7 +23,7 @@ const SectionHeader = ({ icon, title, desc }: any) => (
 
 const InputWrapper = ({ label, children, required }: any) => (
   <div className="space-y-1.5">
-    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1 ml-1">
+    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1 ml-1">
       {label} {required && <span className="text-red-500">*</span>}
     </label>
     {children}
@@ -34,6 +35,7 @@ export default function ItemForm() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isEdit = !!id;
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [activeTab, setActiveTab] = useState<'basic' | 'sales' | 'inventory' | 'physical'>('basic');
   const [isSaving, setIsSaving] = useState(false);
@@ -46,7 +48,7 @@ export default function ItemForm() {
     preferredVendorId: '', trackInventory: true, openingStock: 0, openingStockRate: 0,
     reorderLevel: 0, reorderQty: 0, hsnSac: '', barcode: '', weight: 0, 
     weightUnit: 'kg', length: 0, width: 0, height: 0, dimensionUnit: 'cm',
-    status: 'Active'
+    status: 'Active', imageUrl: ''
   });
 
   const [error, setError] = useState('');
@@ -57,6 +59,26 @@ export default function ItemForm() {
       if (item) setFormData({ ...item });
     }
   }, [id, isEdit]);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        alert("Image too large. Please select a file under 2MB.");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData({ ...formData, imageUrl: reader.result as string });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeImage = () => {
+    setFormData({ ...formData, imageUrl: '' });
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,7 +114,7 @@ export default function ItemForm() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto pb-24">
+    <div className="max-w-6xl mx-auto pb-24 animate-in fade-in duration-500">
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
           <button onClick={() => navigate('/items')} className="p-2 hover:bg-white hover:shadow-md rounded-full transition-all text-slate-500 bg-slate-50 border border-slate-200">
@@ -104,7 +126,7 @@ export default function ItemForm() {
           </div>
         </div>
         <div className="flex gap-3">
-          <button type="button" onClick={() => navigate('/items')} disabled={isSaving} className="px-6 py-2.5 font-bold text-slate-500 hover:text-slate-900 transition-colors">Discard</button>
+          <button type="button" onClick={() => navigate('/items')} disabled={isSaving} className="px-6 py-2.5 font-bold text-slate-400 hover:text-slate-900 transition-colors">Discard</button>
           <button 
             type="submit" 
             form="item-form"
@@ -118,7 +140,7 @@ export default function ItemForm() {
       </div>
 
       {error && (
-        <div className="mb-6 p-4 bg-rose-50 border border-rose-100 text-rose-700 font-bold rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
+        <div className="mb-6 p-4 bg-rose-50 border border-rose-100 text-rose-700 font-bold rounded-2xl flex items-center gap-3 animate-in shake duration-300">
           <X className="bg-rose-200 rounded-full p-0.5" size={16} /> {error}
         </div>
       )}
@@ -155,39 +177,83 @@ export default function ItemForm() {
             {activeTab === 'basic' && (
               <div className="space-y-8 animate-in fade-in duration-300">
                 <SectionHeader icon={<Package/>} title="Item Identity" desc="Core details used for identification and grouping." />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="md:col-span-2">
-                    <InputWrapper label="Product / Service Name" required>
-                      <input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full px-4 py-3 border rounded-xl outline-none focus:ring-4 focus:ring-blue-50 transition-all font-bold text-lg" placeholder="e.g. Premium Industrial Degreaser" />
-                    </InputWrapper>
-                  </div>
-                  <InputWrapper label="SKU (Unique Identifier)" required>
-                    <input required value={formData.sku} onChange={e => setFormData({...formData, sku: e.target.value})} className="w-full px-4 py-3 border rounded-xl outline-none focus:ring-4 focus:ring-blue-50 transition-all font-mono uppercase" placeholder="e.g. IDG-001-X" />
-                  </InputWrapper>
-                  <InputWrapper label="Unit of Measure">
-                    <select value={formData.unit} onChange={e => setFormData({...formData, unit: e.target.value})} className="w-full px-4 py-3 border rounded-xl outline-none bg-white">
-                      <option value="pcs">Pcs (Pieces)</option>
-                      <option value="box">Box</option>
-                      <option value="kg">Kg (Kilograms)</option>
-                      <option value="m">Meters</option>
-                      <option value="set">Set</option>
-                      <option value="dz">Dozen</option>
-                    </select>
-                  </InputWrapper>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+                   {/* Product Image Section */}
+                   <div className="md:col-span-1">
+                      <InputWrapper label="Product Media">
+                         <div className="relative group">
+                            {formData.imageUrl ? (
+                               <div className="relative w-full aspect-square rounded-[32px] overflow-hidden border-4 border-slate-50 shadow-inner group">
+                                  <img src={formData.imageUrl} className="w-full h-full object-cover" alt="Preview" />
+                                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                                     <button type="button" onClick={() => fileInputRef.current?.click()} className="p-3 bg-white rounded-full text-blue-600 shadow-lg hover:scale-110 transition-transform"><Camera size={20}/></button>
+                                     <button type="button" onClick={removeImage} className="p-3 bg-white rounded-full text-rose-600 shadow-lg hover:scale-110 transition-transform"><Trash2 size={20}/></button>
+                                  </div>
+                               </div>
+                            ) : (
+                               <button 
+                                  type="button"
+                                  onClick={() => fileInputRef.current?.click()}
+                                  className="w-full aspect-square bg-slate-50 border-4 border-dashed border-slate-200 rounded-[32px] flex flex-col items-center justify-center gap-3 text-slate-400 hover:border-blue-400 hover:bg-blue-50/30 hover:text-blue-600 transition-all group"
+                               >
+                                  <div className="p-4 bg-white rounded-2xl shadow-sm group-hover:scale-110 transition-transform">
+                                     <ImagePlus size={32} />
+                                  </div>
+                                  <span className="text-[10px] font-black uppercase tracking-widest">Upload Image</span>
+                               </button>
+                            )}
+                            <input 
+                               type="file" 
+                               ref={fileInputRef} 
+                               className="hidden" 
+                               accept="image/*" 
+                               onChange={handleImageUpload} 
+                            />
+                         </div>
+                      </InputWrapper>
+                   </div>
+
+                   <div className="md:col-span-2 space-y-8">
+                      <div className="space-y-6">
+                        <InputWrapper label="Product / Service Name" required>
+                          <input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full px-4 py-3 border rounded-xl outline-none focus:ring-4 focus:ring-blue-50 transition-all font-bold text-lg" placeholder="e.g. Premium Industrial Degreaser" />
+                        </InputWrapper>
+                        
+                        <div className="grid grid-cols-2 gap-6">
+                           <InputWrapper label="SKU (Stock Keeping Unit)" required>
+                              <input required value={formData.sku} onChange={e => setFormData({...formData, sku: e.target.value})} className="w-full px-4 py-3 border rounded-xl outline-none focus:ring-4 focus:ring-blue-50 transition-all font-mono uppercase" placeholder="e.g. IDG-001-X" />
+                           </InputWrapper>
+                           <InputWrapper label="Unit of Measure">
+                              <select value={formData.unit} onChange={e => setFormData({...formData, unit: e.target.value})} className="w-full px-4 py-3 border rounded-xl outline-none bg-white">
+                                <option value="pcs">Pcs (Pieces)</option>
+                                <option value="box">Box</option>
+                                <option value="kg">Kg (Kilograms)</option>
+                                <option value="m">Meters</option>
+                                <option value="set">Set</option>
+                                <option value="dz">Dozen</option>
+                              </select>
+                           </InputWrapper>
+                        </div>
+                      </div>
+                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-6">
                   <InputWrapper label="Brand Name">
                     <div className="relative">
                       <Layers className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                      <input value={formData.brand} onChange={e => setFormData({...formData, brand: e.target.value})} className="w-full pl-10 pr-4 py-3 border rounded-xl outline-none" placeholder="e.g. KlenCare Pro" />
+                      <input value={formData.brand} onChange={e => setFormData({...formData, brand: e.target.value})} className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl outline-none" placeholder="e.g. KlenCare Pro" />
                     </div>
                   </InputWrapper>
                   <InputWrapper label="Manufacturer">
-                    <input value={formData.manufacturer} onChange={e => setFormData({...formData, manufacturer: e.target.value})} className="w-full px-4 py-3 border rounded-xl outline-none" placeholder="Producer entity name" />
+                    <input value={formData.manufacturer} onChange={e => setFormData({...formData, manufacturer: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none" placeholder="Producer entity name" />
                   </InputWrapper>
                   <InputWrapper label="Item Category">
-                    <input value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} className="w-full px-4 py-3 border rounded-xl outline-none" placeholder="e.g. Liquids / Safety Gear" />
+                    <input value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none" placeholder="e.g. Liquids / Safety Gear" />
                   </InputWrapper>
                   <InputWrapper label="Status">
-                    <select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})} className="w-full px-4 py-3 border rounded-xl outline-none bg-white">
+                    <select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none bg-white font-bold">
                       <option value="Active">Active</option>
                       <option value="Inactive">Inactive</option>
                     </select>
@@ -225,14 +291,14 @@ export default function ItemForm() {
                       <InputWrapper label="Preferred Vendor">
                         <div className="relative">
                           <Truck className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                          <select value={formData.preferredVendorId} onChange={e => setFormData({...formData, preferredVendorId: e.target.value})} className="w-full pl-10 pr-4 py-3 border rounded-xl outline-none bg-white text-sm">
+                          <select value={formData.preferredVendorId} onChange={e => setFormData({...formData, preferredVendorId: e.target.value})} className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl outline-none bg-white text-sm">
                             <option value="">Choose Supplier...</option>
                             {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
                           </select>
                         </div>
                       </InputWrapper>
                       <InputWrapper label="Tax Preference">
-                         <select value={formData.taxPreference} onChange={e => setFormData({...formData, taxPreference: e.target.value})} className="w-full px-4 py-3 border rounded-xl outline-none bg-white">
+                         <select value={formData.taxPreference} onChange={e => setFormData({...formData, taxPreference: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none bg-white">
                             <option value="Taxable">Taxable</option>
                             <option value="Non-Taxable">Non-Taxable</option>
                          </select>
@@ -263,10 +329,10 @@ export default function ItemForm() {
                     <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Opening Balances</h4>
                     <div className="grid grid-cols-2 gap-4">
                       <InputWrapper label="Opening Stock">
-                        <input type="number" value={formData.openingStock} onChange={e => setFormData({...formData, openingStock: e.target.value})} className="w-full px-4 py-3 border rounded-xl outline-none font-bold" />
+                        <input type="number" value={formData.openingStock} onChange={e => setFormData({...formData, openingStock: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none font-bold" />
                       </InputWrapper>
                       <InputWrapper label="Value per Unit">
-                        <input type="number" value={formData.openingStockRate} onChange={e => setFormData({...formData, openingStockRate: e.target.value})} className="w-full px-4 py-3 border rounded-xl outline-none font-bold" />
+                        <input type="number" value={formData.openingStockRate} onChange={e => setFormData({...formData, openingStockRate: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none font-bold" />
                       </InputWrapper>
                     </div>
                   </div>
@@ -338,7 +404,7 @@ export default function ItemForm() {
             )}
 
             <div className="pt-10 border-t border-slate-100 flex justify-end gap-3">
-              <button type="button" onClick={() => navigate('/items')} disabled={isSaving} className="px-6 py-2.5 font-bold text-slate-500">Cancel</button>
+              <button type="button" onClick={() => navigate('/items')} disabled={isSaving} className="px-6 py-2.5 font-bold text-slate-400">Cancel</button>
               <button type="submit" disabled={isSaving} className="px-12 py-3 bg-blue-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-2xl hover:translate-y-[-2px] transition-all active:scale-95 disabled:opacity-50">
                 {isSaving ? 'Synchronizing Vault...' : 'Save Product Record'}
               </button>

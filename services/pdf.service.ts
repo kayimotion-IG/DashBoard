@@ -229,18 +229,37 @@ export class PDFService {
       ...payments.map(p => ({ date: p.date, ref: p.paymentNumber, type: 'Receipt', debit: 0, credit: p.amount }))
     ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
+    // Layout Styling: Statement Summary
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(KLENCARE_GOLD);
     doc.text('STATEMENT FOR:', 15, 55);
-    doc.setTextColor(TEXT_DARK);
-    doc.text(customer.name, 15, 61);
     
-    if (customer.trn) {
-       doc.setFont('helvetica', 'normal');
-       doc.setFontSize(9);
-       doc.text(`TRN: ${customer.trn}`, 15, 66);
-    }
+    doc.setTextColor(TEXT_DARK);
+    doc.setFontSize(11);
+    doc.text(customer.name, 15, 62);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    const clientLines = [customer.companyName];
+    if (customer.trn) clientLines.push(`TRN: ${customer.trn}`);
+    doc.text(clientLines.filter(Boolean), 15, 68);
+
+    // Summary Box on Right
+    doc.setDrawColor('#e2e8f0');
+    doc.setFillColor('#f8fafc');
+    doc.rect(130, 48, 65, 25, 'FD');
+    
+    doc.setTextColor(TEXT_MUTED);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.text('STATEMENT PERIOD', 135, 54);
+    doc.text('DATE GENERATED', 135, 60);
+    
+    doc.setTextColor(TEXT_DARK);
+    doc.setFont('helvetica', 'normal');
+    doc.text(date ? date.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : 'All Time', 190, 54, { align: 'right' });
+    doc.text(new Date().toLocaleDateString('en-GB'), 190, 60, { align: 'right' });
     
     let runningBalance = 0;
     const rows = ledger.map(entry => {
@@ -249,25 +268,43 @@ export class PDFService {
         new Date(entry.date).toLocaleDateString('en-GB'),
         entry.ref,
         entry.type,
-        entry.debit > 0 ? entry.debit.toFixed(2) : '',
-        entry.credit > 0 ? entry.credit.toFixed(2) : '',
-        runningBalance.toFixed(2)
+        entry.debit > 0 ? entry.debit.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '',
+        entry.credit > 0 ? entry.credit.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '',
+        runningBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })
       ];
     });
 
     autoTable(doc, {
       startY: 85,
-      head: [['Date', 'Reference', 'Type', 'Debit', 'Credit', 'Balance']],
+      head: [['Date', 'Reference', 'Type', 'Debit', 'Credit', 'Balance (AED)']],
       body: rows,
       theme: 'striped',
-      headStyles: { fillColor: KLENCARE_GOLD },
-      columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' } }
+      headStyles: { fillColor: KLENCARE_GOLD, textColor: '#FFFFFF', fontStyle: 'bold' },
+      bodyStyles: { fontSize: 9, cellPadding: 5 },
+      columnStyles: { 
+        3: { halign: 'right' }, 
+        4: { halign: 'right' }, 
+        5: { halign: 'right', fontStyle: 'bold' } 
+      }
     });
 
     const finalY = (doc as any).lastAutoTable.finalY + 15;
-    doc.setFontSize(14);
+    
+    // Proper Alignment for Current Balance as per professional templates
+    doc.setDrawColor(KLENCARE_GOLD);
+    doc.setLineWidth(0.5);
+    doc.line(130, finalY - 5, 195, finalY - 5);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(TEXT_MUTED);
     doc.setFont('helvetica', 'bold');
-    doc.text(`Current Balance: AED ${runningBalance.toLocaleString()}`, 195, finalY, { align: 'right' });
+    doc.text('ACCOUNT SUMMARY:', 15, finalY);
+    
+    doc.setFontSize(14);
+    doc.setTextColor(TEXT_DARK);
+    doc.text(`Current Balance:`, 130, finalY);
+    doc.setTextColor(KLENCARE_GOLD);
+    doc.text(`AED ${runningBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, 195, finalY, { align: 'right' });
 
     this.drawFooter(doc);
     if (isPreview) return doc.output('bloburl');
