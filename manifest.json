@@ -1,8 +1,8 @@
 
 {
   "short_name": "KlenCare",
-  "name": "KlenCare ERP",
-  "description": "High-fidelity CRM and Inventory Management System",
+  "name": "KlenCare ERP Enterprise",
+  "description": "Enterprise CRM and Inventory Management System",
   "icons": [
     {
       "src": "https://res.cloudinary.com/dff96688/image/upload/v1/klencare/logo-192.png",
@@ -22,5 +22,6 @@
   "display": "standalone",
   "theme_color": "#0f172a",
   "background_color": "#0f172a",
-  "orientation": "any"
+  "orientation": "any",
+  "prefer_related_applications": false
 }

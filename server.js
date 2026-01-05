@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import cors from 'cors';
 import { Resend } from 'resend';
+import nodemailer from 'nodemailer';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -21,7 +22,7 @@ const modules = [
   'items', 'customers', 'vendors', 'sales_orders', 'purchase_orders', 
   'invoices', 'bills', 'stock_moves', 'payments_received', 
   'payments_made', 'credit_notes', 'assemblies', 'delivery_challans', 
-  'users', 'receives', 'settings', 'communications'
+  'users', 'receives', 'settings', 'communications', 'expenses'
 ];
 
 const saveEntityData = (name, data) => {
@@ -38,7 +39,9 @@ const loadEntityData = (name) => {
     if (name === 'settings') return { 
       companyName: "KLENCARE ENTERPRISE", 
       currency: "AED",
-      senderEmail: "billing@crm.klencare.net"
+      senderEmail: "billing@crm.klencare.net",
+      smtpHost: "smtp.hostinger.com",
+      smtpPort: "465"
     };
     return [];
   }
@@ -55,13 +58,11 @@ app.use(express.json({ limit: '50mb' }));
 // Module Routes
 modules.forEach(name => {
   app.get(`/api/${name}`, (req, res) => res.json(loadEntityData(name)));
-  
   app.post(`/api/${name}`, (req, res) => {
     const currentData = loadEntityData(name);
     let updatedData;
-    if (name === 'settings') {
-      updatedData = req.body;
-    } else {
+    if (name === 'settings') updatedData = req.body;
+    else {
       const index = currentData.findIndex(i => i.id === req.body.id);
       updatedData = [...currentData];
       if (index !== -1) updatedData[index] = req.body;
@@ -70,7 +71,6 @@ modules.forEach(name => {
     saveEntityData(name, updatedData);
     res.json(req.body);
   });
-
   app.put(`/api/${name}/:id`, (req, res) => {
     const currentData = loadEntityData(name);
     const index = currentData.findIndex(i => i.id === req.params.id);
@@ -78,11 +78,8 @@ modules.forEach(name => {
       currentData[index] = { ...currentData[index], ...req.body };
       saveEntityData(name, currentData);
       res.json(currentData[index]);
-    } else {
-      res.status(404).json({ error: 'Not Found' });
-    }
+    } else res.status(404).json({ error: 'Not Found' });
   });
-  
   app.delete(`/api/${name}/:id`, (req, res) => {
     const currentData = loadEntityData(name);
     const updatedData = currentData.filter(i => i.id !== req.params.id);
@@ -92,45 +89,71 @@ modules.forEach(name => {
 });
 
 /**
- * PRODUCTION EMAIL DISPATCH (RESEND INTEGRATION)
- * Route: POST /api/invoices/:id/email
+ * PRODUCTION EMAIL DISPATCH
  */
 app.post('/api/invoices/:id/email', async (req, res) => {
   const { to, subject, body, sentBy, plainText } = req.body;
   const invoiceId = req.params.id;
   const settings = loadEntityData('settings');
 
-  // Verify Configuration
-  const apiKey = settings.emailApiKey;
-  const fromEmail = settings.senderEmail || 'billing@crm.klencare.net';
+  console.log(`[DISPATCH REQUEST] Recipient: ${to}, Method: SMTP`);
 
-  if (!apiKey) {
-    console.warn('[CRM] Dispatch aborted: No API Key found in settings.');
+  const smtpPort = parseInt(settings.smtpPort) || 465;
+  const useSmtp = settings.smtpHost && (settings.smtpHost.includes('hostinger') || smtpPort !== 0);
+  const apiKey = settings.emailApiKey; 
+  const fromEmail = settings.senderEmail;
+
+  if (!apiKey || !fromEmail) {
     return res.status(400).json({ 
       success: false, 
-      message: 'Email service not configured. Please add your Resend API Key in Settings.' 
+      message: 'Email credentials (Email or Password) are missing in Settings.' 
     });
   }
 
-  const resend = new Resend(apiKey);
-
   try {
-    console.log(`[Resend] Dispatching to ${to} from ${fromEmail}...`);
-    
-    const { data, error } = await resend.emails.send({
-      from: `${settings.companyName || 'KlenCare CRM'} <${fromEmail}>`,
-      to: [to],
-      subject: subject,
-      // If plainText is true, use 'text' field, otherwise wrap in simple HTML for Resend
-      text: plainText ? body : undefined,
-      html: plainText ? undefined : `<div style="font-family: sans-serif; line-height: 1.5; color: #333;">${body.replace(/\n/g, '<br>')}</div>`,
-    });
+    let messageId = '';
 
-    if (error) {
-      throw error;
+    if (useSmtp) {
+      console.log(`[SMTP] Handshaking with ${settings.smtpHost}:${smtpPort}...`);
+      const transporter = nodemailer.createTransport({
+        host: settings.smtpHost,
+        port: smtpPort,
+        secure: smtpPort === 465,
+        auth: {
+          user: fromEmail,
+          pass: apiKey,
+        },
+        tls: {
+          rejectUnauthorized: false 
+        },
+        connectionTimeout: 10000 // 10s timeout
+      });
+
+      // Rapid Verification
+      await transporter.verify();
+
+      const info = await transporter.sendMail({
+        from: `"${settings.companyName}" <${fromEmail}>`,
+        to,
+        subject,
+        text: body,
+        html: plainText ? undefined : `<div style="font-family: sans-serif; line-height: 1.6; color: #1e293b;">${body.replace(/\n/g, '<br>')}</div>`,
+      });
+      messageId = info.messageId;
+      console.log(`[SMTP] Success: ${messageId}`);
+    } else {
+      const resend = new Resend(apiKey);
+      const { data, error } = await resend.emails.send({
+        from: `${settings.companyName} <${fromEmail}>`,
+        to: [to],
+        subject: subject,
+        text: plainText ? body : undefined,
+        html: plainText ? undefined : `<div style="font-family: sans-serif; line-height: 1.6; color: #1e293b;">${body.replace(/\n/g, '<br>')}</div>`,
+      });
+      if (error) throw error;
+      messageId = data.id;
     }
 
-    // Record Success in Communications Log
     const comms = loadEntityData('communications');
     const newLog = {
       id: `COMM-${Date.now()}`,
@@ -142,25 +165,20 @@ app.post('/api/invoices/:id/email', async (req, res) => {
       sentBy,
       timestamp: new Date().toISOString(),
       status: 'Gone',
-      providerId: data.id // Store Resend ID for tracking
+      providerId: messageId
     };
     
     comms.unshift(newLog);
     saveEntityData('communications', comms);
-
-    res.json({ 
-      success: true, 
-      message: `Email successfully dispatched via Resend`, 
-      log: newLog 
-    });
+    res.json({ success: true, message: `Email dispatched successfully`, log: newLog });
 
   } catch (err) {
-    console.error('[Resend Error]:', err);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to send email through Resend.', 
-      details: err.message 
-    });
+    console.error('[SMTP ENGINE ERROR]:', err.code, err.message);
+    let errorMsg = err.message;
+    if (err.code === 'EAUTH') errorMsg = 'Hostinger Authentication Failed: Check your Email Password.';
+    if (err.code === 'ESOCKET') errorMsg = 'Network Error: Hostinger server timed out or blocked connection.';
+    
+    res.status(500).json({ success: false, message: errorMsg });
   }
 });
 

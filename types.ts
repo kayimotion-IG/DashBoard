@@ -278,6 +278,18 @@ export interface CreditNote {
   reason?: string;
 }
 
+export interface Expense {
+  id: string;
+  date: string;
+  category: string;
+  amount: number;
+  vendorId?: string;
+  reference: string;
+  description: string;
+  status: 'Paid' | 'Pending';
+  taxAmount?: number;
+}
+
 export interface AppSettings {
   allowNegativeStock: boolean;
   companyName: string;

@@ -6,12 +6,13 @@ import {
   ArrowUpRight, ArrowDownRight,
   ShoppingCart, Boxes, Receipt, ArrowRight, HandCoins,
   Clock, FileText, Loader2, Handshake, Pin, MailCheck, Globe,
-  CheckCircle2
+  CheckCircle2, Landmark
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { salesService } from '../services/sales.service';
 import { purchaseService } from '../services/purchase.service';
 import { itemService } from '../services/item.service';
+import { expenseService } from '../services/expense.service';
 import { apiRequest } from '../services/api';
 import { useAuth } from '../App';
 
@@ -25,7 +26,8 @@ const Dashboard = () => {
     await Promise.all([
       salesService.refresh(),
       purchaseService.refresh(),
-      itemService.refresh()
+      itemService.refresh(),
+      expenseService.refresh()
     ]);
 
     const sos = salesService.getSalesOrders();
@@ -34,6 +36,7 @@ const Dashboard = () => {
     const customers = salesService.getCustomers();
     const vendors = purchaseService.getVendors();
     const disbursements = purchaseService.getPaymentsMade();
+    const opExpenses = expenseService.getExpenses();
     
     // Fetch last communication
     const comms = await apiRequest('GET', '/api/communications');
@@ -46,6 +49,8 @@ const Dashboard = () => {
     }, 0);
 
     const grossProfit = grossRevenue - totalCost;
+    const totalExpenses = expenseService.getTotalExpenses();
+    const netProfit = grossProfit - totalExpenses;
 
     const arTotal = customers.reduce((sum, c) => sum + (salesService.getCustomerBalance(c.id) || 0), 0);
     const apTotal = vendors.reduce((sum, v) => sum + (purchaseService.getVendorBalance(v.id) || 0), 0);
@@ -55,14 +60,17 @@ const Dashboard = () => {
     const stream = [
       ...invs.map(i => ({ type: 'INV', date: i.date, amount: i.total, ref: i.invoiceNumber, label: 'Sales Invoice', entity: salesService.getCustomerById(i.customerId)?.name || 'Client' })),
       ...receipts.map(r => ({ type: 'REC', date: r.date, amount: r.amount, ref: r.paymentNumber, label: 'Payment Received', entity: salesService.getCustomerById(r.customerId)?.name || 'Client' })),
-      ...disbursements.map(d => ({ type: 'DISB', date: d.date, amount: d.amount, ref: d.paymentNumber, label: 'Vendor Payment', entity: purchaseService.getVendorById(d.vendorId)?.name || 'Supplier' }))
-    ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 6);
+      ...disbursements.map(d => ({ type: 'DISB', date: d.date, amount: d.amount, ref: d.paymentNumber, label: 'Vendor Payment', entity: purchaseService.getVendorById(d.vendorId)?.name || 'Supplier' })),
+      ...opExpenses.map(e => ({ type: 'EXP', date: e.date, amount: e.amount, ref: 'EXPENSE', label: 'Op Expense', entity: e.category }))
+    ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 7);
 
     const pinnedInvoices = invs.filter(i => i.isPinned).slice(0, 3);
 
     setDashboardData({
       grossRevenue,
       grossProfit,
+      totalExpenses,
+      netProfit,
       arTotal,
       apTotal,
       inventoryValue,
@@ -78,7 +86,7 @@ const Dashboard = () => {
     calculateStats();
   }, []);
 
-  const StatCard = ({ label, value, subtext, trend, icon, colorClass, onClick }: any) => (
+  const StatCard = ({ label, value, subtext, trend, icon, colorClass, onClick, inverseTrend }: any) => (
     <div 
       onClick={onClick}
       className="bg-white p-6 rounded-[32px] border border-slate-200 transition-all cursor-pointer group hover:shadow-2xl hover:border-brand/30 relative overflow-hidden"
@@ -87,9 +95,11 @@ const Dashboard = () => {
         <div className={`p-3 rounded-2xl ${colorClass} bg-opacity-10 text-slate-900 group-hover:scale-110 transition-transform`}>
           {icon}
         </div>
-        <div className={`flex items-center gap-1 text-[10px] font-black uppercase tracking-widest ${trend === 'up' ? 'text-emerald-600' : 'text-rose-600'}`}>
+        <div className={`flex items-center gap-1 text-[10px] font-black uppercase tracking-widest ${
+          (trend === 'up' && !inverseTrend) || (trend === 'down' && inverseTrend) ? 'text-emerald-600' : 'text-rose-600'
+        }`}>
           {trend === 'up' ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-          {trend === 'up' ? 'Growth' : 'Liability'}
+          {label.includes('Expense') || label.includes('Payable') ? (trend === 'up' ? 'Liability' : 'Reduced') : (trend === 'up' ? 'Growth' : 'Decline')}
         </div>
       </div>
       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</p>
@@ -111,7 +121,7 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-8 pb-20 animate-in fade-in duration-500 text-slate-900">
-      <div className="relative overflow-hidden bg-slate-900 rounded-[48px] p-10 shadow-2xl border border-white/5">
+      <div className="relative overflow-hidden bg-[#020c1b] rounded-[48px] p-10 shadow-2xl border border-white/5">
          <div className="absolute top-0 right-0 -mr-20 -mt-20 w-[500px] h-[500px] bg-brand rounded-full mix-blend-screen filter blur-[120px] opacity-10 animate-pulse"></div>
          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-10">
             <div className="flex items-center gap-8">
@@ -123,18 +133,18 @@ const Dashboard = () => {
                       <ShieldCheck size={12}/> Vault Persistent
                     </span>
                   </div>
-                  <p className="text-slate-400 text-lg font-medium mt-2">
+                  <p className="text-blue-200/50 text-lg font-medium mt-2">
                     Entity: <span className="text-brand font-bold">{settings.companyName}</span>
                   </p>
                </div>
             </div>
             <div className="flex flex-wrap items-center gap-4">
                <div className="px-8 py-5 bg-white/5 rounded-[28px] border border-white/10 backdrop-blur-md text-right">
-                  <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1">Asset Valuation</p>
+                  <p className="text-[9px] font-black text-blue-300/40 uppercase tracking-[0.2em] mb-1">Asset Valuation</p>
                   <p className="text-2xl font-black text-white">AED {dashboardData.inventoryValue.toLocaleString()}</p>
                </div>
                <div className="px-8 py-5 bg-brand rounded-[28px] shadow-xl shadow-amber-500/20 text-right">
-                  <p className="text-[9px] font-black text-slate-900/60 uppercase tracking-[0.2em] mb-1">Total Receivables</p>
+                  <p className="text-[9px] font-black text-slate-900/60 uppercase tracking-[0.2em] mb-1">Net Receivables</p>
                   <p className="text-2xl font-black text-slate-900">AED {dashboardData.arTotal.toLocaleString()}</p>
                </div>
             </div>
@@ -143,21 +153,31 @@ const Dashboard = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
-          label="Gross Revenue" 
-          value={`AED ${dashboardData.grossRevenue.toLocaleString()}`} 
-          subtext="Total Billables"
-          trend="up" 
-          icon={<BarChart3 size={22} />} 
-          colorClass="bg-blue-600" 
-          onClick={() => navigate('/reports')} 
-        />
-        <StatCard 
           label="Gross Profit" 
           value={`AED ${dashboardData.grossProfit.toLocaleString()}`} 
-          subtext="Revenue - Cost Basis"
+          subtext="Revenue - Inventory Cost"
           trend="up" 
           icon={<Handshake size={22} />} 
           colorClass="bg-emerald-600" 
+          onClick={() => navigate('/reports')} 
+        />
+        <StatCard 
+          label="Op. Expenses" 
+          value={`AED ${dashboardData.totalExpenses.toLocaleString()}`} 
+          subtext="Admin & Overhead"
+          trend="up" 
+          inverseTrend={true}
+          icon={<Landmark size={22} />} 
+          colorClass="bg-rose-600" 
+          onClick={() => navigate('/expenses')} 
+        />
+        <StatCard 
+          label="Net Profit" 
+          value={`AED ${dashboardData.netProfit.toLocaleString()}`} 
+          subtext="The Real Bottom Line"
+          trend={dashboardData.netProfit >= 0 ? "up" : "down"} 
+          icon={<TrendingUp size={22} />} 
+          colorClass="bg-blue-600" 
           onClick={() => navigate('/reports')} 
         />
         <StatCard 
@@ -166,17 +186,8 @@ const Dashboard = () => {
           subtext="Liability to Vendors"
           trend="down" 
           icon={<Truck size={22} />} 
-          colorClass="bg-rose-600" 
+          colorClass="bg-amber-600" 
           onClick={() => navigate('/purchases/bills')} 
-        />
-        <StatCard 
-          label="Inventory Health" 
-          value={dashboardData.lowStockCount === 0 ? 'Optimal' : `${dashboardData.lowStockCount} Low Stock`} 
-          subtext="Asset Control"
-          trend={dashboardData.lowStockCount > 0 ? 'down' : 'up'} 
-          icon={<Boxes size={22} />} 
-          colorClass={dashboardData.lowStockCount > 0 ? 'bg-rose-600' : 'bg-emerald-600'} 
-          onClick={() => navigate('/inventory/dashboard')} 
         />
       </div>
 
@@ -254,11 +265,12 @@ const Dashboard = () => {
              <div className="space-y-4">
                 {dashboardData.financialStream.map((txn: any, idx: number) => {
                   const isIn = txn.type === 'INV' || txn.type === 'REC';
+                  const isExpense = txn.type === 'EXP';
                   return (
-                    <div key={idx} className={`flex items-center justify-between p-5 rounded-[24px] border transition-all ${isIn ? 'bg-emerald-50/30 border-emerald-100/50' : 'bg-rose-50/30 border-rose-100/50'}`}>
+                    <div key={idx} className={`flex items-center justify-between p-5 rounded-[24px] border transition-all ${isExpense ? 'bg-rose-50/50 border-rose-100/50' : isIn ? 'bg-emerald-50/30 border-emerald-100/50' : 'bg-rose-50/30 border-rose-100/50'}`}>
                       <div className="flex items-center gap-5">
-                         <div className={`w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm border ${isIn ? 'text-emerald-600' : 'text-rose-600'}`}>
-                            {isIn ? <ArrowDownRight size={24}/> : <ArrowUpRight size={24}/>}
+                         <div className={`w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm border ${isExpense ? 'text-rose-600' : isIn ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            {isExpense ? <TrendingDown size={24}/> : isIn ? <ArrowDownRight size={24}/> : <ArrowUpRight size={24}/>}
                          </div>
                          <div>
                             <p className="text-sm font-black text-slate-900">{txn.label}: {txn.ref}</p>
@@ -282,7 +294,7 @@ const Dashboard = () => {
         </div>
 
         <div className="space-y-8">
-          <div className="bg-slate-900 p-10 rounded-[40px] shadow-2xl text-white">
+          <div className="bg-[#020c1b] p-10 rounded-[40px] shadow-2xl text-white">
             <h3 className="text-xs font-black text-brand uppercase tracking-[0.2em] mb-8 flex items-center gap-2">
               <Clock size={16} /> Rapid Entry
             </h3>
@@ -290,8 +302,8 @@ const Dashboard = () => {
               <button onClick={() => navigate('/sales/orders/new')} className="flex flex-col items-center gap-3 py-6 bg-white/5 rounded-[24px] text-[10px] font-black uppercase tracking-widest border border-white/10 hover:bg-brand hover:text-slate-900 transition-all">
                 <ShoppingCart size={18}/> Sales
               </button>
-              <button onClick={() => navigate('/items/new')} className="flex flex-col items-center gap-3 py-6 bg-white/5 rounded-[24px] text-[10px] font-black uppercase tracking-widest border border-white/10 hover:bg-blue-600 transition-all">
-                <Package size={18}/> Add Item
+              <button onClick={() => navigate('/expenses/new')} className="flex flex-col items-center gap-3 py-6 bg-white/5 rounded-[24px] text-[10px] font-black uppercase tracking-widest border border-white/10 hover:bg-rose-600 transition-all">
+                <Landmark size={18}/> Expense
               </button>
             </div>
           </div>

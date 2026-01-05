@@ -101,6 +101,12 @@ export class PDFService {
     doc.text(new Date(inv.date).toLocaleDateString('en-GB'), 195, 56, { align: 'right' });
     doc.text(`Due Date:`, 140, 62);
     doc.text(new Date(inv.dueDate).toLocaleDateString('en-GB'), 195, 62, { align: 'right' });
+    
+    // Add LPO Number if present
+    if (inv.lpoNumber) {
+      doc.text(`LPO / Ref:`, 140, 68);
+      doc.text(inv.lpoNumber, 195, 68, { align: 'right' });
+    }
 
     autoTable(doc, {
       startY: 85,

@@ -1,5 +1,5 @@
 {
-  "name": "KlenCare CRM",
+  "name": "BlueSea",
   "description": "A high-end Zoho-style CRM, Inventory, and Sales management system built with high-fidelity UI and modular architecture.",
   "requestFramePermissions": [
     "camera"

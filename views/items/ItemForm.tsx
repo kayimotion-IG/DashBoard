@@ -68,7 +68,7 @@ export default function ItemForm() {
         return;
       }
       const reader = new FileReader();
-      reader.onloadend = () => {
+      reader.onload = () => {
         setFormData({ ...formData, imageUrl: reader.result as string });
       };
       reader.readAsDataURL(file);
@@ -159,7 +159,7 @@ export default function ItemForm() {
               onClick={() => setActiveTab(tab.id as any)}
               className={`w-full flex items-center justify-between px-5 py-4 rounded-2xl text-sm font-bold transition-all border ${
                 activeTab === tab.id 
-                ? 'bg-slate-900 text-white border-slate-900 shadow-xl' 
+                ? 'bg-[#020c1b] text-white border-[#020c1b] shadow-xl shadow-blue-900/10' 
                 : 'bg-white text-slate-500 border-slate-200 hover:border-blue-300 hover:text-blue-600'
               }`}
             >
@@ -312,14 +312,14 @@ export default function ItemForm() {
               <div className="space-y-8 animate-in fade-in duration-300">
                 <SectionHeader icon={<Warehouse/>} title="Inventory Management" desc="Configure stock counts, reorder alerts, and tracking modes." />
                 
-                <div className="flex items-center gap-4 p-6 bg-slate-900 text-white rounded-3xl shadow-xl">
+                <div className="flex items-center gap-4 p-6 bg-[#020c1b] text-white rounded-3xl shadow-xl">
                   <div className="p-3 bg-blue-600 rounded-2xl"> <ShieldCheck size={24}/> </div>
                   <div className="flex-1">
                     <p className="text-sm font-black">Dynamic Inventory Tracking</p>
-                    <p className="text-xs text-slate-400">Enable this to generate ledger entries and track stock levels in real-time.</p>
+                    <p className="text-xs text-blue-200/50">Enable this to generate ledger entries and track stock levels in real-time.</p>
                   </div>
-                  <div className="flex items-center gap-2 px-4 py-2 bg-slate-800 rounded-xl">
-                    <span className="text-[10px] font-black uppercase">{formData.trackInventory ? 'Active' : 'Disabled'}</span>
+                  <div className="flex items-center gap-2 px-4 py-2 bg-blue-900/40 rounded-xl">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-blue-300">{formData.trackInventory ? 'Active' : 'Disabled'}</span>
                     <input type="checkbox" checked={formData.trackInventory} onChange={e => setFormData({...formData, trackInventory: e.target.checked})} className="w-5 h-5 accent-blue-500" />
                   </div>
                 </div>

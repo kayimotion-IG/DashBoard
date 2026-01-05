@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'klencare-v2';
+const CACHE_NAME = 'klencare-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -27,15 +27,36 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  if (event.request.mode === 'navigate') {
+  // Strategy: Network First for HTML and Scripts to ensure latest version is always fetched if online
+  if (event.request.mode === 'navigate' || event.request.destination === 'script') {
     event.respondWith(
-      fetch(event.request).catch(() => caches.match('./index.html'))
+      fetch(event.request)
+        .then(response => {
+          const resClone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, resClone));
+          return response;
+        })
+        .catch(() => caches.match(event.request))
     );
     return;
   }
+
+  // Strategy: Cache First for other static assets
   event.respondWith(
     caches.match(event.request).then((response) => {
-      return response || fetch(event.request);
+      return response || fetch(event.request).then(fetchRes => {
+        return caches.open(CACHE_NAME).then(cache => {
+          cache.put(event.request, fetchRes.clone());
+          return fetchRes;
+        });
+      });
     })
   );
+});
+
+// Listener to force update
+self.addEventListener('message', (event) => {
+  if (event.data === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });

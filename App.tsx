@@ -10,7 +10,7 @@ import {
   DownloadCloud, MonitorSmartphone, Wifi, WifiOff,
   Hammer, ShoppingBag, Store, HandCoins, Loader2, Download,
   Monitor, Smartphone, ChevronRight, X, Info, CheckCircle,
-  MailCheck
+  MailCheck, RefreshCw, Landmark
 } from 'lucide-react';
 
 import Dashboard from './views/Dashboard.tsx';
@@ -47,6 +47,9 @@ import GoodsReceiveList from './views/purchases/GoodsReceiveList.tsx';
 import GoodsReceiveForm from './views/purchases/GoodsReceiveForm.tsx';
 import PaymentMadeList from './views/purchases/PaymentMadeList.tsx';
 import PaymentMadeForm from './views/purchases/PaymentMadeForm.tsx';
+
+import Expenses from './views/expenses/Expenses.tsx';
+import ExpenseForm from './views/expenses/ExpenseForm.tsx';
 
 import Reports from './views/Reports.tsx';
 import Settings from './views/Settings.tsx';
@@ -113,6 +116,7 @@ export default function App() {
     const handlePrompt = (e: any) => {
       e.preventDefault();
       setDeferredPrompt(e);
+      console.log('KlenCare: Install Prompt Captured');
     };
     window.addEventListener('beforeinstallprompt', handlePrompt);
     return () => window.removeEventListener('beforeinstallprompt', handlePrompt);
@@ -137,6 +141,20 @@ export default function App() {
     setInstalling(false);
   };
 
+  const handleSystemUpdate = async () => {
+    if (confirm('Clear application cache and force-fetch the latest version from localhost?')) {
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (let registration of registrations) {
+          await registration.unregister();
+        }
+      }
+      const cacheNames = await caches.keys();
+      await Promise.all(cacheNames.map(name => caches.delete(name)));
+      window.location.reload();
+    }
+  };
+
   const refreshSettings = () => setSettings(itemService.getSettings());
   const login = async () => true;
   const logout = () => {
@@ -145,12 +163,12 @@ export default function App() {
   };
   const can = (perm: string) => true;
 
-  if (loading) return <div className="h-screen w-screen flex items-center justify-center bg-slate-900"><div className="w-10 h-10 border-4 border-brand border-t-transparent rounded-full animate-spin"></div></div>;
+  if (loading) return <div className="h-screen w-screen flex items-center justify-center bg-[#020c1b]"><div className="w-10 h-10 border-4 border-brand border-t-transparent rounded-full animate-spin"></div></div>;
 
   const NavItem = ({ label, icon, path }: { label: string, icon: any, path: string }) => {
     const active = location.pathname === path || (path !== '/' && location.pathname.startsWith(path));
     return (
-      <Link to={path} className={`flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-[11px] font-bold ${active ? 'bg-brand text-slate-900 shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
+      <Link to={path} className={`flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-[11px] font-bold ${active ? 'bg-brand text-slate-900 shadow-md shadow-brand/20' : 'text-blue-100/60 hover:bg-blue-900/40 hover:text-white'}`}>
         {React.cloneElement(icon, { size: 14 })}
         {label}
       </Link>
@@ -159,7 +177,7 @@ export default function App() {
 
   const NavSection = ({ title, children }: { title: string, children?: React.ReactNode }) => (
     <div className="space-y-0.5 pt-4 first:pt-0">
-      <p className="px-3 text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1.5">{title}</p>
+      <p className="px-3 text-[9px] font-black text-blue-400/40 uppercase tracking-widest mb-1.5">{title}</p>
       {children}
     </div>
   );
@@ -167,8 +185,8 @@ export default function App() {
   return (
     <AuthContext.Provider value={{ user, loading, login, logout, can, settings, refreshSettings }}>
       <div className="flex h-screen bg-slate-50 overflow-hidden text-slate-900 font-sans relative">
-        <aside className="w-64 bg-slate-950 flex flex-col border-r border-slate-800 shrink-0">
-          <div className="p-5 border-b border-slate-800/50 flex items-center justify-between">
+        <aside className="w-64 bg-[#020c1b] flex flex-col border-r border-blue-900/20 shrink-0">
+          <div className="p-5 border-b border-blue-900/20 flex items-center justify-between">
              <div className="flex items-center gap-3">
                 <div className="w-7 h-7 bg-brand rounded-lg flex items-center justify-center font-black text-slate-900 shadow-lg text-xs">K</div>
                 <span className="text-sm font-bold text-white tracking-tight">KlenCare <span className="text-brand">ERP</span></span>
@@ -200,6 +218,7 @@ export default function App() {
               <NavItem label="Purchase Orders" icon={<ShoppingBag />} path="/purchases/orders" />
               <NavItem label="Goods Receive" icon={<PackageCheck />} path="/purchases/receives" />
               <NavItem label="Vendor Bills" icon={<Wallet />} path="/purchases/bills" />
+              <NavItem label="Operating Expenses" icon={<Landmark />} path="/expenses" />
               <NavItem label="Payments Made" icon={<CreditCard />} path="/purchases/payments" />
             </NavSection>
 
@@ -208,19 +227,29 @@ export default function App() {
             </NavSection>
           </nav>
 
-          <div className="p-3 space-y-2 bg-slate-900/40 border-t border-slate-800">
-            <button 
-              onClick={handleInstallApp}
-              disabled={installing}
-              className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg font-black text-[9px] uppercase tracking-widest transition-all border ${
-                isStandalone 
-                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' 
-                : 'bg-slate-800 hover:bg-slate-700 text-brand border-brand/10 shadow-lg shadow-black/20'
-              }`}
-            >
-              {installing ? <Loader2 size={14} className="animate-spin"/> : isStandalone ? <CheckCircle size={14} /> : <DownloadCloud size={14} />}
-              {installing ? 'Preparing...' : isStandalone ? 'Desktop Ready' : 'Install ERP App'}
-            </button>
+          <div className="p-3 space-y-2 bg-[#0f172a]/40 border-t border-blue-900/20">
+            <div className="grid grid-cols-2 gap-2">
+               <button 
+                onClick={handleInstallApp}
+                disabled={installing}
+                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg font-black text-[9px] uppercase tracking-widest transition-all border ${
+                  isStandalone 
+                  ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' 
+                  : 'bg-blue-900/40 hover:bg-blue-900/60 text-brand border-brand/10 shadow-lg shadow-black/20'
+                }`}
+              >
+                {installing ? <Loader2 size={12} className="animate-spin"/> : isStandalone ? <CheckCircle size={12} /> : <DownloadCloud size={12} />}
+                {isStandalone ? 'Installed' : 'Install'}
+              </button>
+              <button 
+                onClick={handleSystemUpdate}
+                className="flex-1 flex items-center justify-center gap-2 py-2 bg-blue-900/40 border border-blue-800/40 text-blue-200/60 rounded-lg font-black text-[9px] uppercase tracking-widest hover:text-white hover:border-blue-700 transition-all"
+                title="Force Update App"
+              >
+                <RefreshCw size={12} />
+                Refresh
+              </button>
+            </div>
 
             <div className="flex items-center gap-3 px-1 py-1">
               <div className="w-8 h-8 rounded-full bg-brand flex items-center justify-center text-[10px] font-black text-slate-900 uppercase">AD</div>
@@ -228,10 +257,10 @@ export default function App() {
                 <p className="text-[10px] font-bold text-white truncate">{user?.name}</p>
                 <div className="flex items-center gap-1">
                   <ShieldCheck size={10} className="text-emerald-500" />
-                  <p className="text-[8px] text-slate-400 font-bold uppercase">Enterprise Admin</p>
+                  <p className="text-[8px] text-blue-300 font-bold uppercase">Enterprise Admin</p>
                 </div>
               </div>
-              <Link to="/settings" className="text-slate-500 hover:text-white p-1.5 hover:bg-slate-800 rounded-lg transition-all"><SettingsIcon size={14} /></Link>
+              <Link to="/settings" className="text-blue-300/50 hover:text-white p-1.5 hover:bg-blue-900/40 rounded-lg transition-all"><SettingsIcon size={14} /></Link>
             </div>
           </div>
         </aside>
@@ -273,6 +302,11 @@ export default function App() {
             <Route path="/purchases/bills/new" element={<BillForm />} />
             <Route path="/purchases/payments" element={<PaymentMadeList />} />
             <Route path="/purchases/payments/new" element={<PaymentMadeForm />} />
+            
+            <Route path="/expenses" element={<Expenses />} />
+            <Route path="/expenses/new" element={<ExpenseForm />} />
+            <Route path="/expenses/edit/:id" element={<ExpenseForm />} />
+
             <Route path="/reports" element={<Reports />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/admin/team" element={<TeamAccess />} />
@@ -283,7 +317,7 @@ export default function App() {
         </main>
 
         {showInstallGuide && (
-          <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6 bg-slate-950/90 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6 bg-slate-900/90 backdrop-blur-sm animate-in fade-in duration-300">
             <div className="bg-white w-full max-w-2xl rounded-[40px] shadow-2xl overflow-hidden flex flex-col border border-white/10 animate-in zoom-in-95 duration-300">
               <div className="p-8 border-b border-slate-100 flex items-center justify-between shrink-0 bg-slate-50/50">
                 <div className="flex items-center gap-4">

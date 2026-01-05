@@ -162,8 +162,18 @@ export default function InvoiceDetail() {
                     <input value={invoice.invoiceNumber} onChange={e => setInvoice({...invoice, invoiceNumber: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-2xl font-bold text-slate-900 outline-none" />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Customer TRN</label>
-                    <input value={invoice.lpoNumber || ''} onChange={e => setInvoice({...invoice, lpoNumber: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-2xl font-mono text-sm outline-none" />
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">LPO / Reference Number</label>
+                    <input value={invoice.lpoNumber || ''} onChange={e => setInvoice({...invoice, lpoNumber: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-2xl font-mono text-sm outline-none" placeholder="Enter LPO number..." />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Customer TRN (Fixed Profile)</label>
+                    <div className="w-full px-4 py-3 border border-slate-100 bg-slate-50 rounded-2xl font-mono text-sm text-slate-400">
+                      {customer.trn || 'NO TRN REGISTERED'}
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Due Date</label>
+                    <input type="date" value={invoice.dueDate} onChange={e => setInvoice({...invoice, dueDate: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-2xl text-sm outline-none" />
                   </div>
               </div>
             </div>

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Lock, AlertCircle, Loader2, ShieldCheck, User as UserIcon } from 'lucide-react';
 import { itemService } from '../../services/item.service';
@@ -31,7 +32,7 @@ export default function Login({ onLogin }: LoginProps) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden">
+    <div className="min-h-screen bg-[#020c1b] flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden">
       {/* Abstract Background Orbs */}
       <div className="absolute top-0 left-0 -ml-20 -mt-20 w-[600px] h-[600px] bg-blue-600/10 rounded-full blur-[120px] pointer-events-none"></div>
       <div className="absolute bottom-0 right-0 -mr-20 -mb-20 w-[600px] h-[600px] bg-amber-600/10 rounded-full blur-[120px] pointer-events-none"></div>
@@ -45,9 +46,9 @@ export default function Login({ onLogin }: LoginProps) {
                 alt="KlenCare Logo" 
                 className="h-24 w-auto object-contain brightness-110 drop-shadow-[0_15px_35px_rgba(251,175,15,0.3)] transition-transform group-hover:scale-105 duration-500" 
               />
-              <div className="absolute -bottom-2 right-0 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded-md flex items-center gap-1 shadow-lg">
+              <div className="absolute -bottom-2 right-0 bg-[#020c1b] border border-blue-900/40 px-2 py-0.5 rounded-md flex items-center gap-1 shadow-lg">
                 <ShieldCheck size={10} className="text-emerald-500" />
-                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Encrypted</span>
+                <span className="text-[8px] font-black text-blue-200/50 uppercase tracking-widest">Encrypted</span>
               </div>
             </div>
           ) : (
@@ -55,16 +56,16 @@ export default function Login({ onLogin }: LoginProps) {
           )}
         </div>
         <h2 className="text-center text-2xl font-black text-white tracking-tight">System Integrity Vault</h2>
-        <p className="mt-2 text-center text-[10px] text-slate-500 font-bold uppercase tracking-[0.3em]">
+        <p className="mt-2 text-center text-[10px] text-blue-300/40 font-bold uppercase tracking-[0.3em]">
           KlenCare Enterprise CRM Gateway
         </p>
       </div>
 
       <div className="mt-10 sm:mx-auto sm:w-full sm:max-w-md relative z-10">
-        <div className="bg-slate-900/50 backdrop-blur-2xl py-12 px-4 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] sm:rounded-[40px] sm:px-12 border border-white/5">
+        <div className="bg-[#0f172a]/50 backdrop-blur-2xl py-12 px-4 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] sm:rounded-[40px] sm:px-12 border border-white/5">
           <form className="space-y-8" onSubmit={handleSubmit}>
             <div>
-              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-1 mb-2">Access Username</label>
+              <label className="block text-[10px] font-black text-blue-300/40 uppercase tracking-[0.2em] ml-1 mb-2">Access Username</label>
               <div className="relative group">
                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-[#fbaf0f] transition-colors">
                   <UserIcon size={20} />
@@ -81,7 +82,7 @@ export default function Login({ onLogin }: LoginProps) {
             </div>
 
             <div>
-              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-1 mb-2">Security Passkey</label>
+              <label className="block text-[10px] font-black text-blue-300/40 uppercase tracking-[0.2em] ml-1 mb-2">Security Passkey</label>
               <div className="relative group">
                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-[#fbaf0f] transition-colors">
                   <Lock size={20} />
@@ -121,18 +122,18 @@ export default function Login({ onLogin }: LoginProps) {
                 <div className="w-full border-t border-slate-800"></div>
               </div>
               <div className="relative flex justify-center text-[10px] font-black uppercase tracking-[0.2em]">
-                <span className="px-4 bg-slate-900 text-slate-600">Secure Audit Active</span>
+                <span className="px-4 bg-[#0f172a] text-blue-300/30">Secure Audit Active</span>
               </div>
             </div>
           </div>
         </div>
         <div className="mt-8 flex flex-col items-center gap-2">
-          <p className="text-[10px] text-slate-600 font-bold uppercase tracking-widest">
+          <p className="text-[10px] text-blue-300/20 font-bold uppercase tracking-widest">
             &copy; 2026 KlenCare Technologies UAE
           </p>
           <div className="flex items-center gap-4">
              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
-             <span className="text-[8px] text-slate-700 font-black uppercase tracking-tighter">Enterprise Mode Active</span>
+             <span className="text-[8px] text-blue-300/30 font-black uppercase tracking-tighter">Enterprise Mode Active</span>
           </div>
         </div>
       </div>

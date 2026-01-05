@@ -4,7 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, Edit2, History, Package, BarChart2, 
   Database, Info, Calendar, FileText, User as UserIcon,
-  Maximize2, Image as ImageIcon, Clock
+  Maximize2, ImageIcon, Clock
 } from 'lucide-react';
 import { itemService } from '../../services/item.service';
 import { auditService } from '../../services/audit.service';
@@ -118,7 +118,6 @@ export default function ItemDetail() {
                            <span className="text-xs font-bold text-slate-400 uppercase tracking-tighter">Profit Contribution</span>
                            <span className="text-sm font-black text-emerald-600">+AED {(item.sellingPrice - item.purchasePrice).toLocaleString()}</span>
                         </div>
-                     </div>
                   </div>
                </div>
 
@@ -211,7 +210,6 @@ export default function ItemDetail() {
                          <span className="text-sm font-black text-slate-900">{log.userName}</span>
                          <span className="text-[9px] px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full font-black uppercase tracking-widest">{log.action}</span>
                       </div>
-                      {/* Fixed Error in file views/items/ItemDetail.tsx on line 214: Added missing Clock import */}
                       <p className="text-[10px] text-slate-400 font-mono uppercase tracking-widest flex items-center gap-1"><Clock size={10} /> {new Date(log.timestamp).toLocaleString()}</p>
                     </div>
                     <p className="text-xs text-slate-500 font-medium">{log.details}</p>
@@ -223,21 +221,21 @@ export default function ItemDetail() {
         </div>
 
         <div className="space-y-6">
-          <div className="bg-slate-900 p-8 rounded-[40px] shadow-2xl text-white relative overflow-hidden">
+          <div className="bg-[#020c1b] p-8 rounded-[40px] shadow-2xl text-white relative overflow-hidden">
             <div className="absolute bottom-0 right-0 -mb-10 -mr-10 w-40 h-40 bg-blue-600 rounded-full blur-[80px] opacity-20"></div>
             <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em] mb-6">Stock Health Matrix</h4>
             <div className="text-center py-6 border-b border-white/5">
               <p className="text-6xl font-black">{totalStock}</p>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mt-3">Available {item.unit}</p>
+              <p className="text-[10px] font-black text-blue-200/50 uppercase tracking-[0.3em] mt-3">Available {item.unit}</p>
             </div>
             <div className="pt-6 grid grid-cols-2 gap-4">
               <div className="text-center border-r border-white/5">
                 <p className="text-sm font-black text-amber-500">{Number(item.reorderLevel) || 0}</p>
-                <p className="text-[9px] font-black text-slate-500 uppercase tracking-tighter">Threshold</p>
+                <p className="text-[9px] font-black text-blue-200/30 uppercase tracking-tighter">Threshold</p>
               </div>
               <div className="text-center">
                 <p className="text-sm font-black text-blue-400">{Number(item.reorderQty) || 0}</p>
-                <p className="text-[9px] font-black text-slate-500 uppercase tracking-tighter">Batch Qty</p>
+                <p className="text-[9px] font-black text-blue-200/30 uppercase tracking-tighter">Batch Qty</p>
               </div>
             </div>
           </div>
