@@ -29,7 +29,7 @@ export default function ItemDetail() {
 
   if (!item) return <div className="p-20 text-center font-bold text-slate-400">Loading item data...</div>;
 
-  const totalStock = Object.values(stockInfo.balance).reduce((a: any, b: any) => a + b, 0) as number;
+  const totalStock = Object.values(stockInfo.balance).reduce((a: any, b: any) => a + Number(b), 0) as number;
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-20 animate-in fade-in duration-500">
@@ -80,7 +80,6 @@ export default function ItemDetail() {
         <div className="lg:col-span-2 space-y-6">
           {activeTab === 'overview' && (
             <div className="space-y-6">
-               {/* Gallery Hero Section */}
                <div className="bg-white rounded-[40px] border border-slate-200 overflow-hidden shadow-sm flex flex-col md:flex-row">
                   <div className="w-full md:w-1/2 aspect-square md:aspect-auto bg-slate-50 border-r border-slate-100 relative group">
                      {item.imageUrl ? (
@@ -118,6 +117,7 @@ export default function ItemDetail() {
                            <span className="text-xs font-bold text-slate-400 uppercase tracking-tighter">Profit Contribution</span>
                            <span className="text-sm font-black text-emerald-600">+AED {(item.sellingPrice - item.purchasePrice).toLocaleString()}</span>
                         </div>
+                     </div>
                   </div>
                </div>
 

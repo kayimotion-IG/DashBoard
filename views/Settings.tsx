@@ -298,7 +298,7 @@ export default function Settings() {
               <div className="p-8 space-y-6 overflow-y-auto max-h-[70vh]">
                  <div className="space-y-2">
                     <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest">1. SPF Record (Hostinger)</h4>
-                    <p className="text-[11px] text-slate-500">Go to Hostinger Panel -> DNS Zones -> Add TXT Record</p>
+                    <p className="text-[11px] text-slate-500">Go to Hostinger Panel {"->"} DNS Zones {"->"} Add TXT Record</p>
                     <div className="flex items-center gap-2 p-3 bg-slate-50 border rounded-xl font-mono text-xs text-slate-700">
                        <span className="flex-1 truncate">v=spf1 include:_spf.mail.hostinger.com ~all</span>
                        <button onClick={() => copyText('v=spf1 include:_spf.mail.hostinger.com ~all')} className="text-blue-500 hover:text-blue-700"><Copy size={14}/></button>
